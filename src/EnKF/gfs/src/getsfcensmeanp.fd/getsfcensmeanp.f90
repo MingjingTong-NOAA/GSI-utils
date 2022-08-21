@@ -311,7 +311,6 @@ program getsfcensmeanp
         latdim = get_dim(dset,'grid_yt'); latb = latdim%len
         levdim = get_dim(dset,'pfull');   levs = levdim%len
         allocate(values_2d_avg(lonb,latb))
-        allocate(values_3d_avg(lonb,latb,levs))
         if (mype == 0) then
            dseto = create_dataset(filenameout, dset, copy_vardata=.true.)
            print *,'opened netcdf file ',trim(filenameout)
@@ -341,6 +340,8 @@ program getsfcensmeanp
               endif
            elseif (dset%variables(nvar)%ndims == 4) then
               call read_vardata(dset,trim(dset%variables(nvar)%name),values_3d)
+              if (allocated(values_3d_avg)) deallocate(values_3d_avg)
+              allocate(values_3d_avg, mold=values_3d)
               call mpi_allreduce(values_3d,values_3d_avg,lonb*latb*levs,mpi_real4,mpi_sum,new_comm,iret)
               values_3d_avg = values_3d_avg * rnanals
               if (mype == 0) then
@@ -354,7 +355,9 @@ program getsfcensmeanp
            endif
         enddo
         if (mype == 0) call close_dataset(dseto)
-        deallocate(values_2d,values_2d_avg,values_3d,values_3d_avg)
+        deallocate(values_2d,values_2d_avg)
+        if (allocated(values_3d)) deallocate(values_3d)
+        if (allocated(values_3d_avg)) deallocate(values_3d_avg)
      endif
 ! Jump here if more mpi processors than files to process
   else
