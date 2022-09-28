@@ -17,20 +17,15 @@ __email__ = "rahul.mahajan@nasa.gov"
 __copyright__ = "Copyright 2016, NOAA / NCEP / EMC"
 __license__ = "GPL"
 __status__ = "Prototype"
-__all__ = ['get_convdiag_list',
-           'get_convdiag_indices',
-           'get_convdiag_data',
-           'get_raddiag_list',
-           'get_raddiag_indices',
-           'get_raddiag_data',
-           'GSIstat']
+__all__ = ['GSIstat']
 
 import numpy as _np
 import pandas as _pd
 import re as _re
-import read_diag as _rd
+"""import read_diag as _rd """
 from datetime import datetime as _datetime
 
+"""
 def _read_diag_conv(fname,endian='big'):
     '''
     Helper function to read a conventional diagnostic file
@@ -192,6 +187,8 @@ def get_raddiag_data(fname,indx,qty,endian='big'):
 
     return val
 
+"""
+
 class GSIstat(object):
     '''
     Object containing the GSI statistics
@@ -213,7 +210,7 @@ class GSIstat(object):
         else:
             self.analysis_date = _datetime.strptime(adate, '%Y%m%d%H')
 
-        fh = open(self.filename, 'rb')
+        fh = open(self.filename, 'r')
         self._lines = fh.readlines() # Keep lines private
         fh.close()
 
@@ -314,9 +311,9 @@ class GSIstat(object):
         satellites  = sorted(otype.index.get_level_values('satellite' ).unique())
 
         if instrument not in instruments:
-            print 'Instrument %s not found!' % instrument
-            print '%s contains ...' % self.filename
-            print ', '.join(str(x) for x in instruments)
+            print ('Instrument %s not found!' % instrument)
+            print ('%s contains ...' % self.filename)
+            print (', '.join(str(x) for x in instruments))
             return None
 
         # Handle special instruments

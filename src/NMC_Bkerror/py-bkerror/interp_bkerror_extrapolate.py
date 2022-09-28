@@ -69,7 +69,7 @@ class GSIbkgerr(object):
         return
 
 
-# bkerror file to read; e.g. global_berror.l64y258.f77, from high res to low res, without extrapolation
+# bkerror file to read; e.g. global_berror.l64y258.f77, from low res to high res with extrapolation
 parser = ArgumentParser(description='read and interpolate background error file',formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('--filename',help='background error file to read',type=str,required=True)
 parser.add_argument('--imax',help='interpolate to imax',type=int,required=False,default=None)
@@ -110,53 +110,75 @@ slat_n = 180. / np.arccos(-1.) * np.arcsin(glat_n[::-1])
 print ('Interpolate from %d to %d' % (gsi.nlat, gsi_n.nlat))
 
 tmp = gsi.agvin.reshape(gsi.nlat,-1)
-f = interp2d(ssig2,slat,tmp,kind=interp_kind)
+f = interp2d(ssig2,slat,tmp,kind=interp_kind,bounds_error=False)
 tmp_n = f(ssig2,slat_n)
 gsi_n.agvin = np.array(tmp_n.reshape(gsi_n.nlat,gsi_n.nsig,gsi_n.nsig),dtype=np.float32)
 
-f = interp2d(ssig,slat,gsi.bgvin,kind=interp_kind)
+f = interp2d(ssig,slat,gsi.bgvin,kind=interp_kind,bounds_error=False)
 tmp_n = f(ssig,slat_n)
 gsi_n.bgvin = np.array(tmp_n,dtype=np.float32)
 
-f = interp2d(ssig,slat,gsi.wgvin,kind=interp_kind)
+f = interp2d(ssig,slat,gsi.wgvin,kind=interp_kind,bounds_error=False)
 tmp_n = f(ssig,slat_n)
 gsi_n.wgvin = np.array(tmp_n,dtype=np.float32)
 
 tmp = gsi.corzin.reshape(gsi.nlat,-1)
-f = interp2d(ssig3,slat,tmp,kind=interp_kind)
+f = interp2d(ssig3,slat,tmp,kind=interp_kind,bounds_error=False)
 tmp_n = f(ssig3,slat_n)
 gsi_n.corzin = np.array(tmp_n.reshape(gsi_n.nlat,gsi_n.nsig,6),dtype=np.float32)
 
 tmp = gsi.hscalesin.reshape(gsi.nlat,-1)
-f = interp2d(ssig3,slat,tmp,kind=interp_kind)
+f = interp2d(ssig3,slat,tmp,kind=interp_kind,bounds_error=False)
 tmp_n = f(ssig3,slat_n)
 gsi_n.hscalesin = np.array(tmp_n.reshape(gsi_n.nlat,gsi_n.nsig,6),dtype=np.float32)
 
 tmp = gsi.vscalesin.reshape(gsi.nlat,-1)
-f = interp2d(ssig3,slat,tmp,kind=interp_kind)
+f = interp2d(ssig3,slat,tmp,kind=interp_kind,bounds_error=False)
 tmp_n = f(ssig3,slat_n)
 gsi_n.vscalesin = np.array(tmp_n.reshape(gsi_n.nlat,gsi_n.nsig,6),dtype=np.float32)
 
-f = interp2d(ssig,slat,gsi.corq2in,kind=interp_kind)
+f = interp2d(ssig,slat,gsi.corq2in,kind=interp_kind,bounds_error=False)
 tmp_n = f(ssig,slat_n)
 gsi_n.corq2in = np.array(tmp_n,dtype=np.float32)
 
-f = interp2d(slon,slat,gsi.corsstin,kind=interp_kind)
+f = interp2d(slon,slat,gsi.corsstin,kind=interp_kind,bounds_error=False)
 tmp_n = f(slon_n,slat_n)
 gsi_n.corsstin = np.array(tmp_n,dtype=np.float32)
 
-f = interp2d(slon,slat,gsi.hsstin,kind=interp_kind)
+f = interp2d(slon,slat,gsi.hsstin,kind=interp_kind,bounds_error=False)
 tmp_n = f(slon_n,slat_n)
 gsi_n.hsstin = np.array(tmp_n,dtype=np.float32)
 
-#f = interp1d(slat.astype(np.float),gsi.corpin.astype(np.float),kind=interp_kind,fill_value="extrapolate")
-f = interp1d(slat.astype(np.float),gsi.corpin.astype(np.float),kind=interp_kind)
+f = interp1d(slat.astype(np.float),gsi.corpin.astype(np.float),kind=interp_kind,bounds_error=False)
 tmp_n = f(slat_n)
+nn=tmp_n.size
+print ('nn ', nn, tmp_n[nn-1])
+for i in range(5):
+    if np.isnan(tmp_n[i]):
+        ii = i
+    if np.isnan(tmp_n[nn-1-i]):
+        jj = nn-1-i 
+tmp_n[:ii+1]=tmp_n[ii+1]
+tmp_n[jj:]=tmp_n[jj-1]
+print (tmp_n[:ii+10])
+print (tmp_n[jj-10:])
+        
 gsi_n.corpin = np.array(tmp_n,dtype=np.float32)
 
-#f = interp1d(slat.astype(np.float),gsi.hscalespin.astype(np.float),kind=interp_kind,fill_value="extrapolate")
-f = interp1d(slat.astype(np.float),gsi.hscalespin.astype(np.float),kind=interp_kind)
+f = interp1d(slat.astype(np.float),gsi.hscalespin.astype(np.float),kind=interp_kind,bounds_error=False)
+#f = interp1d(slat,gsi.hscalespin,kind=interp_kind,bounds_error=False,fill_value="extrapolate")
+# interp1d can't do extrapolation, do it manually
 tmp_n = f(slat_n)
+for i in range(5):
+    if np.isnan(tmp_n[i]):
+        ii = i
+    if np.isnan(tmp_n[nn-1-i]):
+        jj = nn-1-i
+tmp_n[:ii+1]=tmp_n[ii+1]
+tmp_n[jj:]=tmp_n[jj-1]
+print (tmp_n[:ii+10])
+print (tmp_n[jj-10:])
+
 gsi_n.hscalespin = np.array(tmp_n,dtype=np.float32)
 
 # Print some info about the interpolated data

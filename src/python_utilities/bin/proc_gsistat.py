@@ -109,9 +109,13 @@ def plot_profile(uv, t, q, stat='rms'):
     gs = gspec.GridSpec(1, 3)
 
     lmin,lmax = 1020,95
-    levs = [1000, 900, 800, 600, 400, 300, 250, 200, 150, 100, 50]
 
     for v,var in enumerate(['uv','t','q']):
+
+        if var == 'q':
+            levs = [1000, 950, 900, 850, 800, 700, 600, 500, 400, 300, 0]
+        else:
+            levs = [1000, 900, 800, 600, 400, 300, 250, 200, 150, 100, 50]
 
         data_dict = eval(var)
 
@@ -140,7 +144,7 @@ def plot_profile(uv, t, q, stat='rms'):
             if ( xmin_ < xmin ): xmin = xmin_
             if ( xmax_ > xmax ): xmax = xmax_
 
-        if ( v in [0] ): plt.legend(loc=0,numpoints=1)
+        if ( v in [0] ): plt.legend(loc=2,numpoints=1,fontsize='10')
 
         if ( v in [0] ): plt.ylabel('pressure (hPa)',fontsize=12)
 
@@ -220,7 +224,7 @@ def plot_cost(minim):
     ymin,ymax = np.min(df2.min()),np.max(df2.max())
     dy = ymax - ymin
     ymin,ymax = ymin-0.1*dy,ymax+0.1*dy
-    plt.ylim(ymin,ymax)
+    plt.ylim(top=ymax)
     plt.title('Cost function reduction\n%s'%title_substr,fontsize='x-large',fontweight='bold')
 
     return fig
@@ -269,8 +273,8 @@ def plot_gradient(minim):
 
     ymin,ymax = np.min(df2.min()),np.max(df2.max())
     dy = ymax - ymin
-    ymin,ymax = ymin-0.1*dy,ymax+0.1*dy
-    plt.ylim(ymin,ymax)
+    ymin,ymax = max(1., ymin-0.1*dy),ymax+0.1*dy
+    plt.ylim(top=ymax)
     plt.title('Gradient reduction\n%s'%title_substr,fontsize='x-large',fontweight='bold')
 
     return fig
@@ -406,6 +410,10 @@ if __name__ == '__main__':
     parser.add_argument('-l','--label',help='list of labels for experiment IDs',nargs='+',required=False)
     parser.add_argument('-s','--save_figure',help='save figures as png and pdf',action='store_true',required=False)
     parser.add_argument('-i','--instruments',help='list of instruments to show',nargs='+',required=False, default=None)
+    parser.add_argument('-cycfreq','--cycle_freq',help='cycle frequency',type=str,required=False,default='6H')
+    parser.add_argument('-d','--dump',help='forecast type gfs or gdas',type=str,nargs='+',required=False,default='gdas')
+    parser.add_argument('-cg','--plot_costg',help='plot cost function',action='store_true',required=False)
+    parser.add_argument('-rad','--plot_rad',help='plot satellite radiance',action='store_true',required=False)
 
     args = parser.parse_args()
 
@@ -413,35 +421,52 @@ if __name__ == '__main__':
     bdate = datetime.strptime(args.begin_date,'%Y%m%d%H')
     edate = bdate if args.end_date is None else datetime.strptime(args.end_date,'%Y%m%d%H')
     archdirs = args.archive_dir
+    if not type(archdirs) is list:
+        archdirs = [archdirs]
     save_figure = args.save_figure
     labels = expids if args.label is None else expids if len(args.label) != len(expids) else args.label
     instruments = args.instruments
+    cycle_freq = args.cycle_freq
+    cdumps = args.dump
+    if not type(cdumps) is list:
+        cdumps = [cdumps]
+    plot_costg = args.plot_costg
+    plot_rad = args.plot_rad
 
     if ( edate < bdate ):
-        print 'start date cannot be after end date, switching!'
+        print ('start date cannot be after end date, switching!')
         bdate,edate = edate,bdate
 
     if len(expids) > 1 and len(archdirs) == 1:
         archdirs = archdirs * len(expids)
 
+    if len(expids) > 1 and len(cdumps) == 1:
+        cdumps = cdumps * len(expids)
+
     # Collect all the objects for all expids and all dates
     gsistat, ps, uv, t, q, minim, oz, rad = {}, {}, {}, {}, {}, {}, {}, {}
-    for expid,archdir in zip(expids,archdirs):
+    for expid,cdump,archdir in zip(expids,cdumps,archdirs):
 
-        print 'reading in data for experiment ... %s' % expid
+        print ('reading in data for experiment ... %s' % expid)
 
         gsistat[expid] = []
-        for adate in pd.date_range(bdate,edate,freq='6H'):
-            fname = os.path.join(archdir,expid,'gsistat.gdas.%s'%adate.strftime('%Y%m%d%H'))
+        for adate in pd.date_range(bdate,edate,freq=cycle_freq):
+            if cdump == 'ensmean':
+                fname = os.path.join(archdir,expid,'gsistat.gdas.%s.ensmean'%(adate.strftime('%Y%m%d%H')))
+            else:
+                fname = os.path.join(archdir,expid,'gsistat.%s.%s'%(cdump,adate.strftime('%Y%m%d%H')))
+            print (fname)
             if not os.path.exists(fname):
-                print '\033[1;31m' + '%s does not exist' % fname + '\033[1;m'
+                print ('\033[1;31m' + '%s does not exist' % fname + '\033[1;m')
                 continue
-            gsistat[expid].append(lgsi.GSIstat(fname,adate.to_datetime()))
+            gsistat[expid].append(lgsi.GSIstat(fname,adate.to_pydatetime()))
 
         pstyp = [120,180,181,187]
         uvtyp = [220,221,230,231,232,233,280,282]
-        ttyp = [120,130,131,132,133,180,182]
-        qtyp = [120,132,133,180,182]
+        #ttyp = [120,130,131,132,133,180,182]
+        ttyp = [120,180,182]
+        #qtyp = [120,132,133,180,182]
+        qtyp = [120,180,182]
 
         ps[expid] = get_data1(gsistat[expid],'ps',it=1,use='asm',typ=pstyp)
         uv[expid] = get_data1(gsistat[expid],'uv',it=1,use='asm',typ=uvtyp)
@@ -478,10 +503,12 @@ if __name__ == '__main__':
     fig = plot_profile(uv,t,q,stat='rms') ; figs.append(fig) ; fignames.append('rms')
     fig = plot_profile(uv,t,q,stat='bias') ; figs.append(fig) ; fignames.append('bias')
     fig = plot_profile(uv,t,q,stat='count') ; figs.append(fig) ; fignames.append('count')
-    fig = plot_cost(minim) ; figs.append(fig) ; fignames.append('cost')
-    fig = plot_gradient(minim) ; figs.append(fig) ; fignames.append('gradient')
-    fig = plot_sat(oz,otype='ozone') ; figs += fig; fignames += ['oz_read','oz_assim']
-    fig = plot_sat(rad,otype='radiance') ; figs += fig; fignames += ['rad_read','rad_assim']
+    if plot_costg:
+        fig = plot_cost(minim) ; figs.append(fig) ; fignames.append('cost')
+        fig = plot_gradient(minim) ; figs.append(fig) ; fignames.append('gradient')
+        fig = plot_sat(oz,otype='ozone') ; figs += fig; fignames += ['oz_read','oz_assim']
+        if plot_rad:
+            fig = plot_sat(rad,otype='radiance') ; figs += fig; fignames += ['rad_read','rad_assim']
     if instruments is not None:
         for inst in instruments:
             fig = plot_channel(insts[inst],inst=inst) ; figs.append(fig) ; fignames.append(inst)

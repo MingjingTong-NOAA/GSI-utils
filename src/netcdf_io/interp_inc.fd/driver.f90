@@ -27,7 +27,7 @@
 
  implicit none
 
- integer, parameter :: num_recs = 9
+ integer, parameter :: num_recs = 12
 
 ! Declare externals
  external :: w3tagb, netcdf_err, splat, ipolatev, &
@@ -35,6 +35,7 @@
 
  character(len=128) :: outfile, infile
  character(len=11)  :: records(num_recs) 
+ integer :: nvar, num_recs_actual
 
  integer :: i, j, mi, iret, mo, rec
  integer :: lon_in, lat_in
@@ -52,6 +53,8 @@
  integer :: id_t_inc_out, id_sphum_inc_out
  integer :: id_liq_wat_inc_out, id_o3mr_inc_out
  integer :: id_icmr_inc_out, id_dim
+ integer :: id_rwmr_inc_out, id_snmr_inc_out
+ integer :: id_grle_inc_out
  integer :: header_buffer_val = 16384
  integer :: kgds_in(200), kgds_out(200)
  integer :: ip, ipopt(20), no
@@ -74,10 +77,10 @@
 
  ! NOTE: u_inc,v_inc must be consecutive
  data records /'u_inc', 'v_inc', 'delp_inc', 'delz_inc', 'T_inc', &
-               'sphum_inc', 'liq_wat_inc', 'o3mr_inc', 'icmr_inc' /
+               'sphum_inc', 'liq_wat_inc', 'o3mr_inc', 'icmr_inc',&
+               'rwmr_inc', 'snmr_inc', 'grle_inc'/
 
- namelist /setup/ lon_out, lat_out, outfile, infile, lev
-
+ namelist /setup/ lon_out, lat_out, outfile, infile, lev, nvar
 
 !-----------------------------------------------------------------
 ! MPI initialization
@@ -91,6 +94,9 @@ call mpi_comm_size(mpi_comm_world, npes, mpierr)
 ! with data below.
 !-----------------------------------------------------------------
 
+ nvar=10
+ num_recs_actual=9
+
  if (mype == 0)  call w3tagb('INTERP_INC', 2019, 100, 0, 'EMC')
 
  if (mype == 0) print*,'- READ SETUP NAMELIST'
@@ -101,6 +107,8 @@ call mpi_comm_size(mpi_comm_world, npes, mpierr)
    stop 44
  endif
  close (43)
+
+ if (nvar > 10) num_recs_actual=num_recs
 
  if (mype == 0) print*,"- WILL INTERPOLATE TO GAUSSIAN GRID OF DIMENSION ",lon_out, lat_out
 
@@ -182,6 +190,17 @@ call mpi_comm_size(mpi_comm_world, npes, mpierr)
   
    error = nf90_def_var(ncid_out, 'icmr_inc', nf90_float, (/dim_lon_out,dim_lat_out,dim_lev_out/), id_icmr_inc_out)
    call netcdf_err(error, 'defining variable icmr_inc for file='//trim(outfile) )
+
+   if (nvar > 10) then
+      error = nf90_def_var(ncid_out, 'rwmr_inc', nf90_float, (/dim_lon_out,dim_lat_out,dim_lev_out/), id_rwmr_inc_out)
+      call netcdf_err(error, 'defining variable rwmr_inc for file='//trim(outfile))
+
+      error = nf90_def_var(ncid_out, 'snmr_inc', nf90_float, (/dim_lon_out,dim_lat_out,dim_lev_out/), id_snmr_inc_out)
+      call netcdf_err(error, 'defining variable snmr_inc for file='//trim(outfile))
+
+      error = nf90_def_var(ncid_out, 'grle_inc', nf90_float, (/dim_lon_out,dim_lat_out,dim_lev_out/), id_grle_inc_out)
+      call netcdf_err(error, 'defining variable grle_inc for file='//trim(outfile))
+   end if
   
    error = nf90_put_att(ncid_out, nf90_global, 'source', 'GSI')
    call netcdf_err(error, 'defining source attribute for file='//trim(outfile) )
@@ -333,7 +352,7 @@ call mpi_comm_size(mpi_comm_world, npes, mpierr)
  allocate(go3(mo,lev))
 
  call mpi_barrier(mpi_comm_world, mpierr)
- do rec = 1, num_recs
+ do rec = 1, num_recs_actual
 
    ! skip v_inc (done with u_inc, which comes first)
    if (trim(records(rec)) .eq. 'v_inc') cycle
