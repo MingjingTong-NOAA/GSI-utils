@@ -24,6 +24,9 @@ siglev_data = np.loadtxt(siglev)
 nlevs = int(siglev_data[0,1]-1)
 ak = siglev_data[1:nlevs+2,0]
 bk = siglev_data[1:nlevs+2,1]
+print (nlevs)
+print (ak)
+print (bk)
 
 # constants
 rd = 2.8705e+2
@@ -59,7 +62,7 @@ for k in range(nlevs):
     #presslmn[k] = 0.5*(pressimn[k]+pressimn[k+1])
     # linear in logp interpolation from interface pressures
     #presslmn[k] = np.exp(0.5*(np.log(pressimn[k])+np.log(pressimn[k+1])))
-    print k,presslmn[k]
+    print (k,presslmn[k])
 logp = -np.log(presslmn) # (ranges from -2 to -11)
 
 
@@ -79,23 +82,23 @@ frac = 0.0
 while frac < thresh:
     frac = evals[nlevs-neig-1:nlevs].sum()/evalsum
     neig += 1
-print 'neig = ',neig
+print ('neig = ',neig)
 zz = (eigs*np.sqrt(evals/frac)).T
 #print evals
 f = open('vlocal_eig.dat','w')
 f.write('%s %s %s\n' % (neig,thresh,cutoff))
-print 'rescaled eigenvalues'
+print ('rescaled eigenvalues')
 eigsum = 0.
 for j in range(neig):
     f.write('%s\n' % evals[nlevs-j-1])
-    print j+1,evals[nlevs-j-1]/frac
+    print (j+1,evals[nlevs-j-1]/frac)
     eigsum += evals[nlevs-j-1]/frac
     for k in range(nlevs):
         f.write('%s\n' % zz[nlevs-j-1,k])
 f.close()
-print 'sum of scaled truncated eigvals should equal sum of original evals'
-print '(difference below should be nearly zero)'
-print np.abs(eigsum-evals.sum())
+print ('sum of scaled truncated eigvals should equal sum of original evals')
+print ('(difference below should be nearly zero)')
+print (np.abs(eigsum-evals.sum()))
 
 # check data
 f = open('vlocal_eig.dat','r')
@@ -109,16 +112,16 @@ for j in range(neig):
         evecs2[j,k] = float(f.readline())
 # this should be a diagonal matrix with eigvals on diagonal
 covlocal2 = np.dot(evecs2,evecs2.T)
-print 'diagonal elements of scaled dot(E,E^T), should be scaled evals'
-print np.diag(covlocal2)
+print ('diagonal elements of scaled dot(E,E^T), should be scaled evals')
+print (np.diag(covlocal2))
 mask = np.ones(covlocal2.shape, dtype=bool)
 np.fill_diagonal(mask, 0)
-print 'max/min off diagonal elements (should be zero)',covlocal2[mask].max(),covlocal2[mask].min()
+print ('max/min off diagonal elements (should be zero)',covlocal2[mask].max(),covlocal2[mask].min())
 # this should be the (truncated) localization matrix
 covlocal2 = np.dot(evecs2.T,evecs2)
 #print covlocal2.shape
-print 'diagonal of localization matrix (should be ones)'
-print np.diag(covlocal2)
+print ('diagonal of localization matrix (should be ones)')
+print (np.diag(covlocal2))
 #print covlocal2[nlevs/2,:]
 
 #plt.figure(2)
