@@ -611,17 +611,30 @@ def plot_cost(minim):
     df.plot(ax=ax,kind='line',linewidth=2.,alpha=alpha,color=lc)
 
     # This is needed to show the second+ outerloops with correct indices
-    xticks = ax.get_xticks()
-    xticklabels = [item.get_text() for item in ax.get_xticklabels()]
-    for i, (xtick,xticklabel) in enumerate(zip(xticks,xticklabels)):
-        tmp = str(xticklabel)
-        if tmp:
-            if int(tmp[1]) > 1:
-                xticks[i] = xticks[i] + 1
-                it = int(tmp.split(',')[-1].strip().split(')')[0]) + 1
-                xticklabels[i] = u'(2, %s)' % str(it)
-    ax.set_xticks(xticks[:-1])
-    ax.set_xticklabels(xticklabels[:-1])
+    #xticks = ax.get_xticks()
+    #xticklabels = [item.get_text() for item in ax.get_xticklabels()]
+    #for i, (xtick,xticklabel) in enumerate(zip(xticks,xticklabels)):
+    #    tmp = str(xticklabel)
+    #    if tmp:
+    #        if int(tmp[1]) > 1:
+    #            xticks[i] = xticks[i] + 1
+    #            it = int(tmp.split(',')[-1].strip().split(')')[0]) + 1
+    #            xticklabels[i] = u'(2, %s)' % str(it)
+    #ax.set_xticks(xticks[:-1])
+    #ax.set_xticklabels(xticklabels[:-1])
+
+    xindex = df.index.get_level_values('Inner')
+    a = np.arange(len(xindex))
+    it1idx = df.xs(1, level='Outer').index.get_level_values('Inner')
+    iouter = len(it1idx)
+    xticks = a[:iouter][::25].tolist()
+    xlabels = xindex[:iouter][::25].tolist()
+    it2idx = df.xs(2, level='Outer').index.get_level_values('Inner')
+    xticks = xticks + a[iouter+25:][::25].tolist()
+    xlabels = xlabels + xindex[iouter+25:][::25].tolist()
+    ax.xaxis.set_ticks(xticks)
+    ax.xaxis.set_ticklabels(xlabels)
+
     ax.set_xlabel('Iteration',fontsize=12)
     ax.set_ylabel('Cost function (x $\mathregular{10^%d}$)' % exponent,fontsize=12)
 
@@ -661,17 +674,30 @@ def plot_gradient(minim):
     df.plot(ax=ax,kind='line',logy=True,linewidth=2.,alpha=alpha,color=lc)
 
     # This is needed to show the second+ outerloops with correct indices
-    xticks = ax.get_xticks()
-    xticklabels = [item.get_text() for item in ax.get_xticklabels()]
-    for i, (xtick,xticklabel) in enumerate(zip(xticks,xticklabels)):
-        tmp = str(xticklabel)
-        if tmp:
-            if int(tmp[1]) > 1:
-                xticks[i] = xticks[i] + 1
-                it = int(tmp.split(',')[-1].strip().split(')')[0]) + 1
-                xticklabels[i] = u'(2, %s)' % str(it)
-    ax.set_xticks(xticks[:-1])
-    ax.set_xticklabels(xticklabels[:-1])
+    #xticks = ax.get_xticks()
+    #xticklabels = [item.get_text() for item in ax.get_xticklabels()]
+    #for i, (xtick,xticklabel) in enumerate(zip(xticks,xticklabels)):
+    #    tmp = str(xticklabel)
+    #    if tmp:
+    #        if int(tmp[1]) > 1:
+    #            xticks[i] = xticks[i] + 1
+    #            it = int(tmp.split(',')[-1].strip().split(')')[0]) + 1
+    #            xticklabels[i] = u'(2, %s)' % str(it)
+    #ax.set_xticks(xticks[:-1])
+    #ax.set_xticklabels(xticklabels[:-1])
+
+    xindex = df.index.get_level_values('Inner')
+    a = np.arange(len(xindex))
+    it1idx = df.xs(1, level='Outer').index.get_level_values('Inner')
+    iouter = len(it1idx)
+    xticks = a[:iouter][::25].tolist()
+    xlabels = xindex[:iouter][::25].tolist()
+    it2idx = df.xs(2, level='Outer').index.get_level_values('Inner')
+    xticks = xticks + a[iouter+25:][::25].tolist()
+    xlabels = xlabels + xindex[iouter+25:][::25].tolist()
+    ax.xaxis.set_ticks(xticks)
+    ax.xaxis.set_ticklabels(xlabels)
+
     ax.set_xlabel('Iteration',fontsize=12)
     ax.set_ylabel('Gradient of Cost function',fontsize=12)
 
@@ -684,7 +710,6 @@ def plot_gradient(minim):
     return fig
 
 def plot_cost_gradient(minim):
-
 
     fig = plt.figure(figsize=(6,8))
     gs = gspec.GridSpec(2, 1)
@@ -710,19 +735,31 @@ def plot_cost_gradient(minim):
     ax = plt.subplot(gs[0])
 
     df.plot(ax=ax,kind='line',linewidth=2.,alpha=alpha,color=lc)
-
+    xindex = df.index.get_level_values('Inner')
+    a = np.arange(len(xindex))
+    it1idx = df.xs(1, level='Outer').index.get_level_values('Inner')
+    iouter = len(it1idx)
+    xticks = a[:iouter][::25].tolist()
+    xlabels = xindex[:iouter][::25].tolist()
+    it2idx = df.xs(2, level='Outer').index.get_level_values('Inner')
+    xticks = xticks + a[iouter+25:][::25].tolist()
+    xlabels = xlabels + xindex[iouter+25:][::25].tolist()
+    #print ('xtick', xticks)
+    #print ('xlabels', xlabels)
+    ax.xaxis.set_ticks(xticks)
+    ax.xaxis.set_ticklabels(xlabels)
     # This is needed to show the second+ outerloops with correct indices
-    xticks = ax.get_xticks()
-    xticklabels = [item.get_text() for item in ax.get_xticklabels()]
-    for i, (xtick,xticklabel) in enumerate(zip(xticks,xticklabels)):
-        tmp = str(xticklabel)
-        if tmp:
-            if int(tmp[1]) > 1:
-                xticks[i] = xticks[i] + 1
-                it = int(tmp.split(',')[-1].strip().split(')')[0]) + 1
-                xticklabels[i] = u'(2, %s)' % str(it)
-    ax.set_xticks(xticks[:-1])
-    ax.set_xticklabels(xticklabels[:-1])
+    #xticks = ax.get_xticks()
+    #xticklabels = [item.get_text() for item in ax.get_xticklabels()]
+    #for i, (xtick,xticklabel) in enumerate(zip(xticks,xticklabels)):
+    #    tmp = str(xticklabel)
+    #    if tmp:
+    #        if int(tmp[1]) > 1:
+    #            xticks[i] = xticks[i] + 1
+    #            it = int(tmp.split(',')[-1].strip().split(')')[0]) + 1
+    #            xticklabels[i] = u'(2, %s)' % str(it)
+    #ax.set_xticks(xticks[:-1])
+    #ax.set_xticklabels(xticklabels[:-1])
     ax.set_xlabel('Iteration Number',fontsize=12)
     ax.set_ylabel('Cost Function (x $\mathregular{10^%d}$)' % exponent,fontsize=12)
     ax.legend(fontsize=12)
@@ -757,17 +794,19 @@ def plot_cost_gradient(minim):
     df.plot(ax=ax,kind='line',logy=True,linewidth=2.,alpha=alpha,color=lc)
 
     # This is needed to show the second+ outerloops with correct indices
-    xticks = ax.get_xticks()
-    xticklabels = [item.get_text() for item in ax.get_xticklabels()]
-    for i, (xtick,xticklabel) in enumerate(zip(xticks,xticklabels)):
-        tmp = str(xticklabel)
-        if tmp:
-            if int(tmp[1]) > 1:
-                xticks[i] = xticks[i] + 1
-                it = int(tmp.split(',')[-1].strip().split(')')[0]) + 1
-                xticklabels[i] = u'(2, %s)' % str(it)
-    ax.set_xticks(xticks[:-1])
-    ax.set_xticklabels(xticklabels[:-1])
+    #xticks = ax.get_xticks()
+    #xticklabels = [item.get_text() for item in ax.get_xticklabels()]
+    #for i, (xtick,xticklabel) in enumerate(zip(xticks,xticklabels)):
+    #    tmp = str(xticklabel)
+    #    if tmp:
+    #        if int(tmp[1]) > 1:
+    #            xticks[i] = xticks[i] + 1
+    #            it = int(tmp.split(',')[-1].strip().split(')')[0]) + 1
+    #            xticklabels[i] = u'(2, %s)' % str(it)
+    #ax.set_xticks(xticks[:-1])
+    #ax.set_xticklabels(xticklabels[:-1])
+    ax.xaxis.set_ticks(xticks)
+    ax.xaxis.set_ticklabels(xlabels)
     ax.set_xlabel('Iteration Number',fontsize=12)
     ax.set_ylabel('Norm of the Gradient',fontsize=12)
     ax.legend(fontsize=12)
@@ -781,6 +820,60 @@ def plot_cost_gradient(minim):
     ymin, ymax = max(1., ymin-0.1*dy), ymax+0.1*dy
     plt.ylim(top=ymax)
     #plt.title('Norm of the Gradient',fontsize='large')
+
+    return fig
+
+def plot_Jo(minim):
+
+    fig,ax = plt.subplots(figsize=(8,6))
+
+    lc = mc[0] if len(labels) == 1 else mc[:len(labels)]
+
+    # Collect all experiments into a single DataFrame
+    tmpdf = []
+    tmpdf2 = []
+    for e,expid in enumerate(labels):
+        tmp = minim[expid].groupby(level=['Outer','Inner']).mean().dropna()['Jo']
+        tmp.name = labels[e]
+        tmpdf.append(tmp)
+        tmp = minim[expid]['Jo']
+        tmp.name = labels[e]
+        tmpdf2.append(tmp)
+
+    # Scale the cost-function with 1e5
+    exponent = 5
+    df = pd.concat(tmpdf,axis=1) / np.power(10,exponent)
+    df2 = pd.concat(tmpdf2,axis=1) / np.power(10,exponent)
+
+    #print (df)
+    df.plot(ax=ax,kind='line',linewidth=2.,alpha=alpha,color=lc)
+
+    # This is needed to show the second+ outerloops with correct indices
+    xticks = ax.get_xticks()
+    xticklabels = [item.get_text() for item in ax.get_xticklabels()]
+    #print (xticklabels)
+    for i, (xtick,xticklabel) in enumerate(zip(xticks,xticklabels)):
+        tmp = str(xticklabel)
+        if tmp:
+            if int(tmp[1]) > 1:
+                xticks[i] = xticks[i] + 1
+                it = int(tmp.split(',')[-1].strip().split(')')[0]) + 1
+                xticklabels[i] = u'(2, %s)' % str(it)
+    ax.set_xticks(xticks[:-1])
+    ax.set_xticklabels(xticklabels[:-1])
+    ax.set_xlabel('Iteration Number',fontsize=12)
+    ax.set_ylabel('Jo (x $\mathregular{10^%d}$)' % exponent,fontsize=12)
+    ax.legend(fontsize=12)
+    ax.text(0.15, 0.85, '(a)',
+            verticalalignment='bottom', horizontalalignment='center',
+            transform=ax.transAxes,
+            color='black', fontsize=12)
+
+    ymin,ymax = np.min(df2.min()),np.max(df2.max())
+    dy = ymax - ymin
+    ymin,ymax = ymin-0.1*dy,ymax+0.1*dy
+    plt.ylim(ymin,ymax)
+    #plt.title('Jo',fontsize='large')
 
     return fig
 
@@ -916,7 +1009,7 @@ def plot_channel(dfin,inst=''):
 
     return fig
 
-def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel']):
+def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff=True,wndic=None):
 
     # Collect all experiments into a single DataFrame
     assim = []
@@ -928,27 +1021,41 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel']):
         assim.append(tmp2)
 
     assim = pd.concat(assim,axis=1).dropna()
-    tmp = assim.div(assim.iloc[:,0],axis='index') * 100.0 - 100.0
-    nobsdiff = tmp.drop(tmp.columns[0],axis=1)
-    nclm = len(nobsdiff.columns)
+
+    if normdiff:
+        tmp = assim.div(assim.iloc[:,0],axis='index') * 100.0 - 100.0
+        obscount = tmp.drop(tmp.columns[0],axis=1)
+    else:
+        obscount = assim
+    nclm = len(obscount.columns)
 
     lc = mc[0] if nclm == 1 else mc[:nclm]
 
-    fig,ax = plt.subplots(figsize=(10,8))
-    nobsdiff.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+    fig,ax = plt.subplots(figsize=(10,12))
+    obscount.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
     titlestr = 'Assimilated: # of %s observations\n%s' % (inst.upper(),title_substr)
     ax.set_title(titlestr,fontsize='x-large')
     if len(statslvl) == 1:
-        yindex=nobsdiff.index.get_level_values('channel')
+        yindex=obscount.index.get_level_values('channel')
+        if wndic is not None:
+            y2index=[]
+            for ch in yindex:
+                #print (ch, int(wndic[ch]))
+                y2index.append(f'{ch}, {int(wndic[ch])}')
+            yindex = y2index
+            ax.set_ylabel('Channel, Wavenumber $(cm^{-1})$',fontsize=10)
+        else:
+            ax.set_ylabel('Channel',fontsize=10)
         if len(yindex) > 25:
             a = np.arange(len(yindex))
-            ax.yaxis.set_ticks(a[::5])
-            ax.yaxis.set_ticklabels(yindex[::5])
+            ax.yaxis.set_ticks(a[::2])
+            ax.yaxis.set_ticklabels(yindex[::2], fontsize=8)
+        else:
+            ax.yaxis.set_ticklabels(yindex, fontsize=8)    
         #plt.vlines(0.0,yindex[0],yindex[-1],colors='k',linestyles='-',linewidth=2.0,label=None)
         plt.legend(loc=0,numpoints=1)
         #plt.ylim(1,yindex[-1]+1)
         #plt.yticks(yindex)
-        plt.ylabel('Channel',fontsize=12)
     else:
         yticklabels_new = get_yticklabels_new(ax)
         if len(yticklabels_new) > 25:
@@ -957,22 +1064,28 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel']):
             ax.yaxis.set_ticklabels(yticklabels_new[::5])
         else:
             ax.set_yticklabels(yticklabels_new,fontsize=8)
-    plt.xlabel('Mean Assimilated Obs Count (%, normalized)')    
+    if normdiff:
+        plt.xlabel('Mean Assimilated Obs Count (%, normalized)')    
+    else:
+        plt.xlabel('Mean Assimilated Obs Count')
 
     return fig
 
-def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=False,statslvl=['satellite','channel']):
+def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=False,
+                        statslvl=['satellite','channel'],wndic=None):
 
     if obsnum:
         fig, axes = plt.subplots(1,2,figsize=(8, 6))
     else:
-        fig, ax = plt.subplots(figsize=(10,8))
+        fig, ax = plt.subplots(figsize=(11,8))
 
     # Collect all experiments into a single DataFrame
     if obsnum:
         ax = axes[0]
         assim = []
         for e,expid in enumerate(labels):
+            print ('expid ', expid)
+            print (dfin[expid])
             tmp = dfin[expid].groupby(level=statslvl).mean()
             tmp[['nassim']] = tmp[['nassim']].astype(int)
             tmp2 = tmp['nassim']
@@ -1008,14 +1121,22 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
             #ax.xaxis.set_major_locator(plt.MaxNLocator(7))
             ax.xaxis.set_tick_params(labelsize=8)
             ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
+            if wndic is not None:
+                y2index=[]
+                for ch in yindex:
+                    y2index.append(f'{ch}, {int(wndic[ch])}')
+                ax.set_ylabel('Channel, Wavenumber $(cm^{-1})$',fontsize=10)
+            else:
+                ax.set_ylabel('Channel',fontsize=10)
+                y2index = yindex
             if 'cris' in inst or inst == 'iasi' or inst == 'airs':
                 ax.yaxis.set_ticks(a[::5])
-                ax.yaxis.set_ticklabels(yindex[::5])
+                ax.yaxis.set_ticklabels(y2index[::5])
             else:
                 ax.yaxis.set_ticks(a)
-                ax.yaxis.set_ticklabels(yindex)
+                ax.yaxis.set_ticklabels(y2index)
+
             ax.yaxis.set_tick_params(labelsize=8)
-            ax.set_ylabel('Channel',fontsize=12)
             ax.set_xlabel('Assimilated Obs Count (%, normalized)',fontsize=10)
             ax.text(0.15, 0.9, '(a)',
                     verticalalignment='bottom', horizontalalignment='center',
@@ -1118,6 +1239,7 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
         else:
             ax.yaxis.set_ticks(a)
             ax.yaxis.set_ticklabels(yindex)
+
         ax.yaxis.set_tick_params(labelsize=8)
         ax.set_xlabel('FG std. dev. (%, normalized)',fontsize=10)
         amin = tomfstdwci[[column_std]].values.min()
@@ -1147,7 +1269,7 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
 
     return fig
 
-def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel']):
+def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel'],wndic=None):
 
     # Collect all experiments into a single DataFrame
     omfbc = []
@@ -1170,6 +1292,15 @@ def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel']):
 
     yindex=omfbc.index.values.tolist()
     a = np.arange(len(yindex))
+    if wndic is not None:
+        y2index=[]
+        for ch in yindex:
+            y2index.append(f'{ch}, {int(wndic[ch])}')
+        yindex = y2index
+        ax.set_ylabel('Channel, Wavenumber $(cm^{-1})$',fontsize=10)
+    else:
+        ax.set_ylabel('Channel',fontsize=10)
+
     if inst == 'airs' or inst == 'iasi' or 'cris' in inst:
         ax.yaxis.set_ticks(a[::5])
         ax.yaxis.set_ticklabels(yindex[::5])
@@ -1184,7 +1315,6 @@ def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel']):
         plt.legend(loc=0,numpoints=1)
         #plt.ylim(0,yindex[-1]+1)
         #plt.yticks(yindex)
-        plt.ylabel('Channel',fontsize=12)
     else:
         yticklabels_new = get_yticklabels_new(ax)
         ax.set_yticklabels(yticklabels_new,fontsize=8)
@@ -1192,7 +1322,7 @@ def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel']):
 
     return fig
 
-def plot_channel_omfwobc(dfin,inst='',statslvl=['satellite','channel']):
+def plot_channel_omfwobc(dfin,inst='',statslvl=['satellite','channel'],wndic=None):
 
     # Collect all experiments into a single DataFrame
     omfwobc = []
@@ -1216,6 +1346,15 @@ def plot_channel_omfwobc(dfin,inst='',statslvl=['satellite','channel']):
     yindex=omfwobc.index.values.tolist()
     #print (len(yindex), yindex)
     a = np.arange(len(yindex))
+    if wndic is not None:
+        y2index=[]
+        for ch in yindex:
+            y2index.append(f'{ch}, {int(wndic[ch])}')
+        yindex = y2index
+        ax.set_ylabel('Channel, Wavenumber $(cm^{-1})$',fontsize=10)
+    else:
+        ax.set_ylabel('Channel',fontsize=10)
+
     if inst == 'airs' or inst == 'iasi' or 'cris' in inst:
         ax.yaxis.set_ticks(a[::5])
         ax.yaxis.set_ticklabels(yindex[::5])
@@ -1232,7 +1371,7 @@ def plot_channel_omfwobc(dfin,inst='',statslvl=['satellite','channel']):
         plt.legend(loc=0,numpoints=1)
         #plt.ylim(0,yindex[-1]+1)
         #plt.yticks(yindex)
-        plt.ylabel('Channel',fontsize=12)
+        #plt.ylabel('Channel',fontsize=12)
     else:
         yticklabels_new = get_yticklabels_new(ax)
         ax.set_yticklabels(yticklabels_new,fontsize=8)
@@ -1240,7 +1379,7 @@ def plot_channel_omfwobc(dfin,inst='',statslvl=['satellite','channel']):
 
     return fig
 
-def plot_channel_omfbias(dfin,inst=''):
+def plot_channel_omfbias(dfin,inst='',wndic=None):
 
     # Collect all experiments into a single DataFrame
     figs = []; fignames = []
@@ -1254,6 +1393,16 @@ def plot_channel_omfbias(dfin,inst=''):
         fig,ax = plt.subplots(figsize=(10,8))
         omfbc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
         yindex=omfbc.index.values.tolist()
+        if wndic is not None:
+            y2index=[]
+            for ch in yindex:
+                y2index.append((ch[0], f'{ch[1]}/{int(wndic[ch[1]])}'))
+                #y2index.append((ch[0], (ch[1],int(wndic[ch[1]]))))
+            yindex = y2index
+            ax.set_ylabel('Instrument, Channel/Wavenumber $(cm^{-1})$',fontsize=10)
+        else:
+            ax.set_ylabel('Instrument, Channel',fontsize=10)
+
         if len(yindex) > 50:
             a = np.arange(len(yindex))
             ax.yaxis.set_ticks(a[::5])
@@ -1262,6 +1411,7 @@ def plot_channel_omfbias(dfin,inst=''):
             a = np.arange(len(yindex))
             ax.yaxis.set_ticks(a[::2])
             ax.yaxis.set_ticklabels(yindex[::2])
+
         titlestr = '%s OmF bias of %s observations\n%s' % (labels[e],inst.upper(),title_substr)
         ax.set_title(titlestr,fontsize='x-large')
         yticklabels_new = get_yticklabels_new(ax)
@@ -1271,7 +1421,7 @@ def plot_channel_omfbias(dfin,inst=''):
 
     return figs, fignames
 
-def plot_channel_omf_FGvsANL(dfin,dfin2,dfin3,stats='std',inst=''):
+def plot_channel_omf_FGvsANL(dfin,dfin2,dfin3,stats='std',inst='',wndic=None):
 
     # Collect all experiments into a single DataFrame
 
@@ -1330,6 +1480,14 @@ def plot_channel_omf_FGvsANL(dfin,dfin2,dfin3,stats='std',inst=''):
         lc = ['k','b','r']
 
         yindex=loopstat.index.values.tolist()
+        if wndic is not None:
+            y2index=[]
+            for ch in yindex:
+                y2index.append(f'{ch}, {int(wndic[ch])}')
+            yindex = y2index
+            yaxislabel = 'Channel, Wavenumber $(cm^{-1})$'
+        else:
+            yaxislabel = 'Channel'
 
         ax = plt.subplot(gs[e])
 
@@ -1351,7 +1509,7 @@ def plot_channel_omf_FGvsANL(dfin,dfin2,dfin3,stats='std',inst=''):
         if e == 0:
             ax.legend(loc=0,numpoints=1,fontsize=10)
         if e == 0 or e == 3:
-            ax.set_ylabel('Channel',fontsize=12)
+            ax.set_ylabel(yaxislabel,fontsize=10)
         if stats == 'std':
             ax.set_xlabel('standard deviation')
         elif stats == 'bias':
@@ -1510,6 +1668,8 @@ if __name__ == '__main__':
     parser.add_argument('-u','--plot_used',help='plot used radiance channels',action='store_true',required=False)
     parser.add_argument('-c','--plot_conv',help='plot stats for conventional data',action='store_true',required=False)
     parser.add_argument('-cg','--plot_costg',help='plot cost function',action='store_true',required=False)
+    parser.add_argument('-cgJo','--plot_costgJo',help='plot cost function and Jo',action='store_true',required=False)
+    parser.add_argument('-oz','--plot_oz',help='plot satellite data',action='store_true',required=False)
     parser.add_argument('-rad','--plot_rad',help='plot satellite data',action='store_true',required=False)
     parser.add_argument('-anl','--plot_analysis',help='plot stats for analysis',action='store_true',required=False)
     parser.add_argument('-fganl','--plot_fganl',help='plot stats for FGvsANL',action='store_true',required=False)
@@ -1542,6 +1702,8 @@ if __name__ == '__main__':
     if not type(cdumps) is list:
         cdumps = [cdumps]
     plot_costg = args.plot_costg
+    plot_costgJo = args.plot_costgJo
+    plot_oz = args.plot_oz
     plot_rad = args.plot_rad
 
     if ( edate < bdate ):
@@ -1568,14 +1730,18 @@ if __name__ == '__main__':
     #uvtyp = [220,221,222,223,224,227,228,229,230,231,232,233,234,235,
     #         270,271,280,281,282,283,284,285,286,287,288,291,292,293,294,295]
     #uvtyp = [220,221,230,231,232,233,280,282]
-    #uvtyp = [220,221,230,231,232,233]
-    uvtyp = [220,221]
+    uvtyp = [220,221,229,230,231,232,233,234]
+    #uvtyp = [230,231,232,233,234,235,236]
+    uvtyp = [220]
+    #uvtyp = [221,229]
     #ttyp = [120,130,131,132,133,180,182]
     #ttyp = [120,180,182]
-    ttyp = [120,180]
-    #qtyp = [120,132,133,180,182]
+    ttyp = [120]
+    #ttyp = [130,131,132,133,134,135,136]
+    #qtyp = [120,131,133,134,180,182]
     #qtyp = [120,180,182]
-    qtyp = [120,180]
+    qtyp = [120]
+    #qtyp = [130,131,132,133,134,135,136]
     #gpstyp = [004,722,745,042,043,003]
     #amvtyp = [240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260]
     amvtyp = [242, 243, 244, 245, 246, 247, 250, 252, 253, 254, 257, 258, 259, 260]
@@ -1623,26 +1789,34 @@ if __name__ == '__main__':
             #sst[label] = get_data1(gsistat[label],'sst',it=1,use='asm',typ='all')
             tcp[label] = get_data1(gsistat[label],'tcp',it=1,use='asm',typ='all')
             uv[label] = get_data1(gsistat[label],'uv',it=1,use='asm',typ=uvtyp)
-            #t[label] = get_data1(gsistat[label],'t',it=1,use='asm',typ='all')
-            #q[label] = get_data1(gsistat[label],'q',it=1,use='asm',typ='all')
-            t[label] = get_data1(gsistat[label],'t',it=1,use='asm',typ=ttyp)
-            q[label] = get_data1(gsistat[label],'q',it=1,use='asm',typ=qtyp)
+            t[label] = get_data1(gsistat[label],'t',it=1,use='asm',typ='all')
+            q[label] = get_data1(gsistat[label],'q',it=1,use='asm',typ='all')
+            #t[label] = get_data1(gsistat[label],'t',it=1,use='asm',typ=ttyp)
+            #q[label] = get_data1(gsistat[label],'q',it=1,use='asm',typ=qtyp)
             gps[label] = get_data1(gsistat[label],'gps',it=1,use='asm',typ='all')
             amv[label] = get_data1(gsistat[label],'uv',it=1,use='asm',typ=amvtyp)
             scrm[label] = get_data1(gsistat[label],'uv',it=1,use='asm',typ=scrmtyp)
-            minim[label] = get_data2(gsistat[label],'cost')
-            oz[label] = get_data2(gsistat[label],'oz',select=1,level='it')
-            rad[label] = get_data2(gsistat[label],'rad',select=1,level='it')
 
             if plot_anl or plot_fganl:
                 ps_a[label] = get_data1(gsistat[label],'ps',it=3,use='asm',typ='all')
                 tcp_a[label] = get_data1(gsistat[label],'tcp',it=3,use='asm',typ='all')
                 uv_a[label] = get_data1(gsistat[label],'uv',it=3,use='asm',typ=uvtyp)
-                t_a[label] = get_data1(gsistat[label],'t',it=3,use='asm',typ=ttyp)
-                q_a[label] = get_data1(gsistat[label],'q',it=3,use='asm',typ=qtyp)
+                t_a[label] = get_data1(gsistat[label],'t',it=3,use='asm',typ='all')
+                q_a[label] = get_data1(gsistat[label],'q',it=3,use='asm',typ='all')
+                #t_a[label] = get_data1(gsistat[label],'t',it=3,use='asm',typ=ttyp)
+                #q_a[label] = get_data1(gsistat[label],'q',it=3,use='asm',typ=qtyp)
                 gps_a[label] = get_data1(gsistat[label],'gps',it=3,use='asm',typ='all')
                 amv_a[label] = get_data1(gsistat[label],'uv',it=3,use='asm',typ=amvtyp)
                 scrm_a[label] = get_data1(gsistat[label],'uv',it=3,use='asm',typ=scrmtyp)
+
+        if plot_costg or plot_costgJo:
+            minim[label] = get_data2(gsistat[label],'cost')
+
+        if plot_oz:
+            oz[label] = get_data2(gsistat[label],'oz',select=1,level='it')
+        if plot_rad:
+            rad[label] = get_data2(gsistat[label],'rad',select=1,level='it')
+
 
     # If instruments are desired, get them too
     if instruments is not None:
@@ -1711,12 +1885,17 @@ if __name__ == '__main__':
 
 
     # plot cost function and gradient together
-    if plot_costg: 
+    if plot_costg or plot_costgJo: 
         fig = plot_cost_gradient(minim) ; figs.append(fig) ; fignames.append('cost_gradient')
         fig = plot_cost(minim) ; figs.append(fig) ; fignames.append('cost')
+        if plot_costgJo:
+            fig = plot_Jo(minim); figs.append(fig) ; fignames.append('Jo')
         fig = plot_gradient(minim) ; figs.append(fig) ; fignames.append('gradient')
+
+    if plot_oz:
         figr, figa = plot_sat(oz,otype='ozone') ; figs += [figr, figa] ; fignames += ['oz_read','oz_assim']
-        fig = plot_sat_diff(oz,otype='ozone') ; figs.append(fig); fignames.append('oz_assim_diff')
+        if len(expids) > 1:
+            fig = plot_sat_diff(oz,otype='ozone') ; figs.append(fig); fignames.append('oz_assim_diff')
 
     if plot_conv and plot_fganl:
         for e, expid in enumerate(labels):
@@ -1740,41 +1919,54 @@ if __name__ == '__main__':
         
     if instruments is None and plot_rad:
         #figr, figa = plot_sat(rad,otype='radiance') ; figs += [figr, figa]; fignames += ['rad_read','rad_assim']
-        fig = plot_sat_diff(rad,otype='radiance')
-        if fig is not None:
-            figs.append(fig); fignames.append('rad_assim_diff')
+        if len(expids) > 1:
+            fig = plot_sat_diff(rad,otype='radiance')
+            if fig is not None:
+                figs.append(fig); fignames.append('rad_assim_diff')
 
     if instruments is not None:
-
+        csvdir='/scratch2/GFDL/gfdlscr/Mingjing.Tong/gsidiag/ush/radstats/data'
         for inst in instruments:
+            if 'cris' in inst or inst == 'iasi' or inst == 'airs':
+                instid = inst
+                if 'cris' in inst:
+                    instid = 'cris'
+                wndic=pd.read_csv(f'{csvdir}/wavenumber_{instid}.csv',header=None,index_col=0,squeeze=True).to_dict()
+            else:
+                wndic=None
             if len(insts[inst]) != 0:
                 if len(expids) > 1:
                     # plot difference of assimilated observation
-                    fig = plot_channel_nobsdiff(insts[inst],inst=inst,statslvl=['channel'])
-                    figs.append(fig); fignames.append(inst)
+                    #fig = plot_channel_nobsdiff(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic)
+                    #figs.append(fig); fignames.append(f'obscount_norm_{inst}')
+                    fig = plot_channel_nobsdiff(insts[inst],inst=inst,statslvl=['channel'],normdiff=False,wndic=wndic)
+                    figs.append(fig); fignames.append(f'obscount_{inst}')
                     # plot OmF_std difference grouped by satellite and channel in bars
-                    #fig = plot_channel_radfit(insts[inst],lendf,inst=inst)
+                    #fig = plot_channel_radfit(insts[inst],lendf,inst=inst,wndic=wndic)
                     #figs.append(fig); fignames.append(inst+'fitbar')
                     fig = plot_channel_radfit(insts[inst],lendf,inst=inst,normalize=True,obsnum=True,
-                                              statslvl=['channel'])
+                                              statslvl=['channel'],wndic=wndic)
                     figs.append(fig); fignames.append(inst+'fit')
                     if plot_anl:
                         fig = plot_channel_radfit(insts3[inst],lendf,inst=inst,normalize=True,obsnum=True,
-                                                  statslvl=['channel'])
+                                                  statslvl=['channel'],wndic=wndic)
                         figs.append(fig); fignames.append(inst+'fit_anl')
-                        fig = plot_channel_omf_FGvsANL(insts[inst],insts2[inst],insts3[inst],stats='std',inst=inst)
+                        fig = plot_channel_omf_FGvsANL(insts[inst],insts2[inst],insts3[inst],
+                                                       stats='std',inst=inst,wndic=wndic)
                         figs.append(fig); fignames.append(inst+'std_fganl')
-                        fig = plot_channel_omf_FGvsANL(insts[inst],insts2[inst],insts3[inst],stats='bias',inst=inst)
+                        fig = plot_channel_omf_FGvsANL(insts[inst],insts2[inst],insts3[inst],
+                                                       stats='bias',inst=inst,wndic=wndic)
                         figs.append(fig); fignames.append(inst+'bias_fganl')
-                        fig = plot_channel_omf_FGvsANL(insts[inst],insts2[inst],insts3[inst],stats='count',inst=inst)
+                        fig = plot_channel_omf_FGvsANL(insts[inst],insts2[inst],insts3[inst],
+                                                       stats='count',inst=inst,wndic=wndic)
                         figs.append(fig); fignames.append(inst+'count_fganl')
                     
-                fig = plot_channel_omfbc(insts[inst],inst=inst,statslvl=['channel'])
+                fig = plot_channel_omfbc(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic)
                 figs.append(fig) ; fignames.append(inst+'omf')
-                fig = plot_channel_omfwobc(insts[inst],inst=inst,statslvl=['channel']) 
+                fig = plot_channel_omfwobc(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic) 
                 figs.append(fig) ; fignames.append(inst+'omfwobc')
 
-                bfigs,bfignames = plot_channel_omfbias(insts[inst],inst=inst)
+                bfigs,bfignames = plot_channel_omfbias(insts[inst],inst=inst,wndic=wndic)
                 if save_figure:
                     for fig,figname in zip(bfigs,bfignames):
                         figname = './gsistat_%s' % figname
