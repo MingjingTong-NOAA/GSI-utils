@@ -1,3 +1,14 @@
+#!/bin/sh
+#SBATCH -A gfdlhires
+#SBATCH -o sort_out
+#SBATCH -e sort_err
+#SBATCH -q batch
+#SBATCH --time=00:02:00
+#SBATCH --ntasks=1
+#SBATCH -J sort_diag
+#SBATCH --dependency=afterany:45077143
+wrkdir=/scratch2/NCEPDEV/stmp3/Mingjing.Tong/corr_obs_iasi_metop-c/sea
+ntot=124
 
 cd $wrkdir
 nt=1

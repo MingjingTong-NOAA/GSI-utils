@@ -30,6 +30,8 @@ done
 $nt $type $cloud $angle $instr $wave_out $err_out $corr_out $kreq $infl $inflsurf $inflwv $method $cov_method $chan_set $time_sep $bsize $bcen $netcdf
 EOF
 
+set -x
+
 stype=sea
 if [ $type -eq 0 ] ; then
    stype=glb
@@ -48,10 +50,21 @@ mv Rcov_$instr Rcov_${instr}_${stype}
 [ -f Rcorr_$instr ] && mv Rcorr_$instr Rcorr_${instr}_${stype}
 [ -f wave_$instr ] && mv wave_$instr wave_${instr}_${stype}
 [ -f err_$instr ] && mv err_$instr err_${instr}_${stype}
+[ -f satinfo_err_$instr ] && mv satinfo_err_$instr satinfo_err_${instr}_${stype}
+[ -f chnum_$instr ] && mv chnum_$instr chnum_${instr}_${stype}
 
-cp Rcov_${instr}_${stype} $savdir
+if [ ! -d $savdir/Rcov ]; then
+  mkdir -p $savdir/Rcov
+fi
+if [ ! -d $savdir/Error ]; then
+  mkdir -p $savdir/Error
+fi
 
-[ -f Rcorr_${instr}_${stype} ] && cp Rcorr_${instr}_${stype} $savdir
-[ -f wave_${instr}_${stype} ] && cp wave_${instr}_${stype} $savdir
-[ -f err_${instr}_${stype} ] && cp err_${instr}_${stype} $savdir
+cp -f Rcov_${instr}_${stype} $savdir/Rcov/
+
+[ -f Rcorr_${instr}_${stype} ] && cp -f Rcorr_${instr}_${stype} $savdir/Error/
+[ -f wave_${instr}_${stype} ] && cp -f wave_${instr}_${stype} $savdir/Error/
+[ -f err_${instr}_${stype} ] && cp -f err_${instr}_${stype} $savdir/Error/
+[ -f satinfo_err_${instr}_${stype} ] && cp -f satinfo_err_${instr}_${stype} $savdir/Error/
+[ -f chnum_${instr}_${stype} ] && cp -f chnum_${instr}_${stype} $savdir/Error/
 exit 0

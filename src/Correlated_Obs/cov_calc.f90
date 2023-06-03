@@ -29,11 +29,13 @@ character(5):: ges_stub, anl_stub
 character(9):: gesfile, anlfile
 character(256):: cov_file                                !name of outputted covariance file
 character(256):: wave_file                               !name of outputted file containing channel wavenumbers
+character(256):: chnum_file                              !name of outputted file containing channel number 
 character(256):: err_file                                !name of outputted file containing assumed obs errors
+character(256):: satinfo_file                            !name of outputted file containing satinfo obs errors
 character(256):: corr_file                               !name of outputted correlation file
 character(256):: instr
 integer(i_kind), parameter:: dsize=4500                  !cap size on the number of omg's that can be stored at each time step
-integer(i_kind):: lencov, lencorr, lenwave, lenerr
+integer(i_kind):: lencov, lencorr, lenwave, lenerr, lensat, lenchnum
 integer(i_kind):: reclen, leninstr
 logical:: out_wave                                       !option to output channel wavenumbers
 logical:: out_err                                        !option to output obs errors
@@ -102,7 +104,9 @@ lencov=len_trim('Rcov_')
 cov_file=''
 corr_file=''
 wave_file=''
+chnum_file=''
 err_file=''
+satinfo_file=''
 cov_file(1:lencov)='Rcov_'
 cov_file(lencov+1:lencov+leninstr)=instr
 lencorr=len_trim('Rcorr_')
@@ -111,9 +115,15 @@ corr_file(lencorr+1:leninstr+lencorr)=instr
 lenwave=len_trim('wave_')
 wave_file(1:lenwave)='wave_'
 wave_file(lenwave+1:lenwave+leninstr)=instr
+lenchnum=len_trim('chnum_')
+chnum_file(1:lenchnum)='chnum_'
+chnum_file(lenchnum+1:lenchnum+leninstr)=instr
 lenerr=len_trim('err_')
 err_file(1:lenerr)='err_'
 err_file(lenerr+1:leninstr+lenerr)=instr
+lensat=len_trim('satinfo_err_')
+satinfo_file(1:lensat)='satinfo_err_'
+satinfo_file(lensat+1:leninstr+lensat)=instr
 
 ges_stub(1:5)='dges_'
 anl_stub(1:5)='danl_'
@@ -410,9 +420,20 @@ write(26) indRf
 write(26) Rcov
 close(26)
 
+open(24,file=trim(chnum_file),form='unformatted',access='direct',recl=nch_active)
+write(24,rec=1) indRf
+print *, indRf
+close(24)
+
+if (out_err) then
+   open(27,file=trim(satinfo_file),form='unformatted',access='direct',recl=nch_active)
+   write(27,rec=1) errout
+   close(27)
+end if
 if (out_wave) then
    open(28,file=trim(wave_file),form='unformatted',access='direct',recl=nch_active)
    write(28,rec=1) chaninfo
+   print *, chaninfo
    close(28)
 end if
 if (out_err) then

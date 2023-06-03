@@ -130,10 +130,14 @@ mv Rcov_$instr Rcov_${instr}_${stype}
 [ -f Rcorr_$instr ] && mv Rcorr_$instr Rcorr_${instr}_${stype}
 [ -f wave_$instr ] && mv wave_$instr wave_${instr}_${stype}
 [ -f err_$instr ] && mv err_$instr err_${instr}_${stype}
+[ -f satinfo_err_$instr ] && mv satinfo_err_$instr satinfo_err_${instr}_${stype}
+[ -f chnum_$instr ] && mv chnum_$instr chnum_${instr}_${stype}
 
 cp Rcov_${instr}_${stype} $savdir
 
 [ -f Rcorr_${instr}_${stype} ] && cp Rcorr_${instr}_${stype} $savdir
 [ -f wave_${instr}_${stype} ] && cp wave_${instr}_${stype} $savdir
 [ -f err_${instr}_${stype} ] && cp err_${instr}_${stype} $savdir
+[ -f satinfo_err_${instr}_${stype} ] && cp satinfo_err_${instr}_${stype} $savdir
+[ -f chnum_${instr}_${stype} ] && cp chnum_${instr}_${stype} $savdir
 exit 0

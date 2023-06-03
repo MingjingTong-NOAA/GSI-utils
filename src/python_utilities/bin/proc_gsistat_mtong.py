@@ -1667,6 +1667,7 @@ if __name__ == '__main__':
     parser.add_argument('-i','--instruments',help='list of instruments to show',nargs='+',required=False, default=None)
     parser.add_argument('-u','--plot_used',help='plot used radiance channels',action='store_true',required=False)
     parser.add_argument('-c','--plot_conv',help='plot stats for conventional data',action='store_true',required=False)
+    parser.add_argument('-cnvall','--plot_cnvall',help='plot all conventional uv, t, q',action='store_true',required=False)
     parser.add_argument('-cg','--plot_costg',help='plot cost function',action='store_true',required=False)
     parser.add_argument('-cgJo','--plot_costgJo',help='plot cost function and Jo',action='store_true',required=False)
     parser.add_argument('-oz','--plot_oz',help='plot satellite data',action='store_true',required=False)
@@ -1687,6 +1688,7 @@ if __name__ == '__main__':
         archdirs = [archdirs]
     save_figure = args.save_figure
     plot_conv = args.plot_conv
+    plot_cnvall = args.plot_cnvall
     plot_anl = args.plot_analysis
     plot_fganl = args.plot_fganl
     labels = expids if args.label is None else expids if len(args.label) != len(expids) else args.label
@@ -1730,10 +1732,12 @@ if __name__ == '__main__':
     #uvtyp = [220,221,222,223,224,227,228,229,230,231,232,233,234,235,
     #         270,271,280,281,282,283,284,285,286,287,288,291,292,293,294,295]
     #uvtyp = [220,221,230,231,232,233,280,282]
-    uvtyp = [220,221,229,230,231,232,233,234]
-    #uvtyp = [230,231,232,233,234,235,236]
-    uvtyp = [220]
-    #uvtyp = [221,229]
+    if plot_cnvall:
+        uvtyp = [220,221,229,230,231,232,233,234]
+    else:
+        #uvtyp = [230,231,232,233,234,235,236]
+        uvtyp = [220]
+        #uvtyp = [221,229]
     #ttyp = [120,130,131,132,133,180,182]
     #ttyp = [120,180,182]
     ttyp = [120]
@@ -1789,10 +1793,12 @@ if __name__ == '__main__':
             #sst[label] = get_data1(gsistat[label],'sst',it=1,use='asm',typ='all')
             tcp[label] = get_data1(gsistat[label],'tcp',it=1,use='asm',typ='all')
             uv[label] = get_data1(gsistat[label],'uv',it=1,use='asm',typ=uvtyp)
-            t[label] = get_data1(gsistat[label],'t',it=1,use='asm',typ='all')
-            q[label] = get_data1(gsistat[label],'q',it=1,use='asm',typ='all')
-            #t[label] = get_data1(gsistat[label],'t',it=1,use='asm',typ=ttyp)
-            #q[label] = get_data1(gsistat[label],'q',it=1,use='asm',typ=qtyp)
+            if plot_cnvall:
+                t[label] = get_data1(gsistat[label],'t',it=1,use='asm',typ='all')
+                q[label] = get_data1(gsistat[label],'q',it=1,use='asm',typ='all')
+            else:
+                t[label] = get_data1(gsistat[label],'t',it=1,use='asm',typ=ttyp)
+                q[label] = get_data1(gsistat[label],'q',it=1,use='asm',typ=qtyp)
             gps[label] = get_data1(gsistat[label],'gps',it=1,use='asm',typ='all')
             amv[label] = get_data1(gsistat[label],'uv',it=1,use='asm',typ=amvtyp)
             scrm[label] = get_data1(gsistat[label],'uv',it=1,use='asm',typ=scrmtyp)
@@ -1925,7 +1931,7 @@ if __name__ == '__main__':
                 figs.append(fig); fignames.append('rad_assim_diff')
 
     if instruments is not None:
-        csvdir='/scratch2/GFDL/gfdlscr/Mingjing.Tong/gsidiag/ush/radstats/data'
+        csvdir='/scratch2/GFDL/gfdlscr/Mingjing.Tong/gsidiag/ush/gsistat/data'
         for inst in instruments:
             if 'cris' in inst or inst == 'iasi' or inst == 'airs':
                 instid = inst
