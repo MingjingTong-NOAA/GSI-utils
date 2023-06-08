@@ -132,7 +132,11 @@ program getgribncensmeanp
      if (mype == 0) write(6,*) 'Read netcdf'
      londim = get_dim(dset,'longitude'); lonb = londim%len
      latdim = get_dim(dset,'latitude'); latb = latdim%len
-     levdim = get_dim(dset,'level');   nlevs = levdim%len
+     if (has_var(dset,'level')) then
+       levdim = get_dim(dset,'level');   nlevs = levdim%len
+     else
+       nlevs=1
+     endif
 
      if ( mype == 0 ) then
         write(6,'(a)')   ' '
@@ -152,18 +156,20 @@ program getgribncensmeanp
            endif
         endif
 
-        allocate(values_1d_avg(nlevs), leveldiff(nlevs))
-        call read_vardata(dset,'level',values_1d)
-        call mpi_allreduce(values_1d,values_1d_avg,nlevs,mpi_real4,mpi_sum,new_comm,iret)
-        values_1d_avg = values_1d_avg*rnanals
-        leveldiff = values_1d - values_1d_avg
-        if ( sum(leveldiff) /= 0. ) then
-           write(6,'(2(a,i4))')'***FATAL ERROR***  levels are not consisitent'
-           call mpi_abort(mpi_comm_world,99,iret)
-           stop
-        end if
-        if (allocated(values_1d)) deallocate(values_1d)
-        deallocate(values_1d_avg,leveldiff)
+        if (nlevs > 1) then
+          allocate(values_1d_avg(nlevs), leveldiff(nlevs))
+          call read_vardata(dset,'level',values_1d)
+          call mpi_allreduce(values_1d,values_1d_avg,nlevs,mpi_real4,mpi_sum,new_comm,iret)
+          values_1d_avg = values_1d_avg*rnanals
+          leveldiff = values_1d - values_1d_avg
+          if ( sum(leveldiff) /= 0. ) then
+             write(6,'(2(a,i4))')'***FATAL ERROR***  levels are not consisitent'
+             call mpi_abort(mpi_comm_world,99,iret)
+             stop
+          end if
+          if (allocated(values_1d)) deallocate(values_1d)
+          deallocate(values_1d_avg,leveldiff)
+        endif
 
         allocate(values_2d_avg(lonb,latb))
         allocate(values_2d_tmp(lonb,latb))
@@ -171,8 +177,7 @@ program getgribncensmeanp
         do nvar=1,dset%nvars
            ndims = dset%variables(nvar)%ndims
            if (ndims > 2) then
-               if (ndims == 3 .and. trim(dset%variables(nvar)%name) /= 'hgtsfc') then
-                  ! pressfc
+               if (ndims == 3) then
                   if (mype == 0) print *,'processing ',trim(dset%variables(nvar)%name)
                   call read_vardata(dset,trim(dset%variables(nvar)%name),values_2d)
                   call mpi_allreduce(values_2d,values_2d_avg,lonb*latb,mpi_real4,mpi_sum,new_comm,iret)
@@ -279,7 +284,8 @@ program getgribncensmeanp
         if (allocated(values_3d_avg)) deallocate(values_3d_avg)
         if (allocated(values_3d_tmp)) deallocate(values_3d_tmp)
         if (write_spread_ncio) then
-           deallocate(values_2d_sprd, values_3d_sprd)
+           if (allocated(values_2d_sprd)) deallocate(values_2d_sprd)
+           if (allocated(values_3d_sprd)) deallocate(values_3d_sprd)
         endif
         if (mype == 0) then
            call close_dataset(dseto)
