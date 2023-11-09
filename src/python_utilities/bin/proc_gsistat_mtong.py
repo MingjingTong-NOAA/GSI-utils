@@ -54,6 +54,7 @@ def get_data1(gsistat,varname,it=1,use='asm',typ='all'):
                 #        print '%s is not present in %s' % (t, i.analysis_date.strftime('%Y%m%d%H'))
                 tmp = pd.concat(tmp2)
 
+            """ sum over data types """
             if varname in ['ps', 'sst', 'tcp']:
                 tmp = tmp.groupby(level=['date','it','obs','use']).sum()
             elif varname in ['uv', 't', 'q', 'gps', 'amv']:
@@ -137,24 +138,48 @@ def mean_confidence_interval(data, confidence=0.95):
     return [m, h]
 
 def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=False, 
-                 pairdiff=False, diffsum=False):
+                 pairdiff=False, diffsum=False, ylog=False, nlegend=False,
+                 pltvar=['uv','t','q','gps','amv','scrm']):
 
-    fig = plt.figure(figsize=(12, 8))
-    plt.subplots_adjust(top=0.875, hspace=0.3)
-    gs = gspec.GridSpec(2, 3)
+    fontsize=12
+    lw=2.0
+    if len(pltvar) >=5:
+        fig = plt.figure(figsize=(12, 8))
+        plt.subplots_adjust(top=0.875, hspace=0.3)
+        gs = gspec.GridSpec(2, 3)
+    else:
+        if len(pltvar) == 1:
+            fig = plt.figure(figsize=(4, 3))
+            gs = gspec.GridSpec(1,1)
+            plt.subplots_adjust(bottom=0.15, left=0.15)
+            fontsize=8
+            lw=1.0
+        elif len(pltvar) == 3:
+            fig = plt.figure(figsize=(11, 3))
+            gs = gspec.GridSpec(1,3)
+            plt.subplots_adjust(top=0.875, bottom=0.15, left=0.15)
+            fontsize=8
+        else:
+            fig = plt.figure(figsize=(10, 8))
+            plt.subplots_adjust(top=0.875, hspace=0.3)
+            gs = gspec.GridSpec(2, 2)
 
-    lmin,lmax = 1200,50
+    if ylog:
+        lmin,lmax = 1100,50
 
-    for v,var in enumerate(['uv','t','q','gps','amv','scrm']):
-    #for v,var in enumerate(['scrm']):
-    #for v,var in enumerate(['uv','t','q','amv','scrm']):
+    for v,var in enumerate(pltvar):
         if var == 'q':
-            indexlevs = [1200, 1000, 950, 900, 850, 800, 700, 600, 500, 400, 300]
-            levs = [1000, 950, 900, 850, 800, 700, 600, 500, 400, 300, 0]
+            indexlevs = [1200, 1000, 950, 900, 850, 800, 700, 600, 500, 400, 300, 200]
+            levs = [ 1000, 950, 900, 850, 800, 700, 600, 500, 400, 300, 200 ]
         else:
             indexlevs = [1200,1000, 900, 800, 600, 400, 300, 250, 200, 150, 100, 50]
-            levs = [ 1100, 950, 850, 700, 500, 350, 275, 225, 175, 125, 75 ]
-            
+            levs = [1000, 900, 800, 600, 400, 300, 250, 200, 150, 100, 50]
+        ya = np.arange(len(levs))
+        yb = np.arange(len(indexlevs))
+        if not ylog:
+            lmin = yb[0]
+            lmax = yb[-1]
+  
         data_dict = eval(var)
 
         xmin = 1.e10
@@ -167,20 +192,11 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
         count_cntl=data_dict[labels[0]].xs('count', level='stat')
         #cntldf.where(count_cntl > 0, np.nan, inplace=True) 
         ncount = cntldf.shape[0]
-        """if var == 't' and stat == 'rms':
-            print 'ccccccccccc  cntl'
-            print cntldf """
-        """ [:-1] remove the total stat"""
+        """ [:-1] remove whole column [0:2000] stats"""
         profilec=cntldf.mean()[:-1].values
         for e,expid in enumerate(labels):
-            #print expid, var, stat
             #expdf=data_dict[expid].xs(stat, level='stat', drop_level=False)
             expdf=data_dict[expid].xs(stat, level='stat')
-            """ if var == 't' and stat == 'rms':
-                print 'xxxxxxxxxxxxx'
-                print expdf """
-            #if pairdiff:
-            #expdf.where(count_cntl > 0, np.nan, inplace=True)
 
             profile = expdf.mean()[:-1].values
             if diffsum:
@@ -198,9 +214,6 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
             elif normalize:
                 normdf=expdf.div(cntldf,axis=1)
                 normdf.where(count_cntl > 0, np.nan, inplace=True)
-                """if var == 't':
-                    print 'normdf'
-                    print normdf """
                 if ncount < 12:
                     profile0=normdf.mean()[:-1].values
                 else:
@@ -246,40 +259,48 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                 #profile = profile0 / np.power(10,exponent)
                 profile = profile0
 
+            elevs = np.array(levs) + e
+            if ylog:
+                if stat == 'rms' and ncount >= 12:
+                    yindex = elevs
+                else:
+                    yindex = levs
+            else:
+                yindex = ya+0.5
+
             if (normalize or pairdiff) and len(labels) > 1:
-                elevs = np.array(levs) + e
                 if e == 0:
                     if pairdiff:
-                        plt.vlines(0.0,lmin,lmax,colors='k',linestyles='--',linewidth=2.0,label=None)
+                        plt.vlines(0.0,lmin,lmax,colors='k',linestyles='--',linewidth=lw,label=None)
                     else:
-                        plt.vlines(100.,lmin,lmax,colors='k',linestyles='--',linewidth=2.0,label=None)
+                        plt.vlines(100.,lmin,lmax,colors='k',linestyles='--',linewidth=lw,label=None)
                 else:
                     if stat == 'rms':
                         if ncount >= 12:
-                            ax.errorbar(profilen, elevs, xerr=CI_95n, label=labels[e])
+                            tyidx=yindex+(e-1)*0.05
+                            ax.errorbar(profilen, tyidx, xerr=CI_95n, label=labels[e], color=mc[e], 
+                                        elinewidth=lw,linewidth=lw) 
                         else:
-                            ax.plot(profilen, levs, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
-                                    linewidth=2.0, alpha=alpha)
+                            ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                                    linewidth=lw, alpha=alpha)
                     elif stat == 'count':
-                        ax.plot(profilen, levs, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
-                                linewidth=2.0, alpha=alpha)
+                        ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                                linewidth=lw, alpha=alpha)
             else:
                 if stat == 'rms':
                     if ncount >= 12:
-                        ax.errorbar(profile0, elevs, xerr=CI_95, label=labels[e])
+                        ax.errorbar(profile0, yindex, xerr=CI_95, label=labels[e], color=mc[e])
                     else:
-                        ax.plot(profile0, levs, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
-                                linewidth=2.0, alpha=alpha)
+                        ax.plot(profile0, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                                linewidth=lw, alpha=alpha)
                 elif stat == 'count':
-                    ax.plot(profile, levs, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e], linewidth=2.0, alpha=alpha)
+                    ax.plot(profile, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e], linewidth=lw, alpha=alpha)
                 else:
-                    #print 'profile0', profile.shape, 'levs', len(levs)
-                    #print profile0
-                    ax.plot(profile0, levs, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
-                            linewidth=2.0, alpha=alpha)
+                    ax.plot(profile0, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                            linewidth=lw, alpha=alpha)
 
             if e == 0 and stat == 'bias':
-                plt.vlines(0.,lmin,lmax,colors='k',linestyles='--',linewidth=2.0,label=None)
+                plt.vlines(0.,lmin,lmax,colors='k',linestyles='--',linewidth=lw,label=None)
     
             if (normalize or pairdiff) and ncount >= 12:
                 #print profilen.shape, profilen
@@ -297,65 +318,91 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
             #if ( xmin_ < xmin ): xmin = xmin_
             #if ( xmax_ > xmax ): xmax = xmax_
     
-        if ( v in [5] ): plt.legend(loc=0,fontsize='small',numpoints=1)
- 
-        if ( v in [0,3] ): plt.ylabel('pressure (hPa)',fontsize=12)
+        if len(pltvar) >=5:
+            if ( v in [0,3] ): plt.ylabel('Pressure (hPa)',fontsize=fontsize)
+            if ( v in [5] ): plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
+        else:
+            if len(pltvar) == 1:
+                plt.ylabel('Pressure (hPa)',fontsize=fontsize)
+            else:
+                if ( v in [0,2] ): plt.ylabel('Pressure (hPa)',fontsize=fontsize)
+            if ( v in [0] and not nlegend ): plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
 
         if ( var == 'uv' ):
             var_unit = 'm/s'
-            var_name = 'Winds'
+            var_name = 'Vector Wind'
+            plabel = '(a)'
         elif ( var == 't' ):
             var_unit = 'K'
             var_name = 'Temperature'
+            plabel = '(b)'
         elif ( var == 'q' ):
             var_unit = 'frac'
             var_name = 'Sp. Humidity'
+            plabel = '(c)'
         elif ( var == 'gps' ):
             var_unit = 'rad'
             var_name = 'GPS'
+            plabel = '(d)'
         elif ( var == 'amv' ):
             var_unit = 'm/s'
             var_name = 'AMVs'
+            plabel = '(e)'
         elif (var == 'scrm' ):
             var_unit = 'm/s'
             var_name = 'Scatterometeor'
+            plabel = '(f)'
         
         if normalize or pairdiff:
             if pairdiff:
-                plt.xlabel('normalized difference',fontsize=12)
+                plt.xlabel('normalized difference',fontsize=fontsize)
             else:
-                plt.xlabel('(%, normalized)',fontsize=12)
-            if stat == 'rms':
-                if anl:
-                    plt.suptitle('%s O-A\n%s' % (stat.upper(),title_substr),fontsize='x-large',fontweight='bold')
+                if stat == 'rms':
+                    plt.xlabel('normalized rms O-F (%)',fontsize=fontsize)
                 else:
-                    plt.suptitle('%s O-F\n%s' % (stat.upper(),title_substr),fontsize='x-large',fontweight='bold')
-            elif stat == 'count':
-                plt.suptitle('Normalized Observation Counts\n%s'%title_substr,fontsize='x-large',fontweight='bold')                
+                    plt.xlabel('normalized data count (%)',fontsize=fontsize)
         else:
             if stat in ['rms','bias']:
-                plt.xlabel('(%s)' % var_unit,fontsize=12)
-                if anl:
-                    plt.suptitle('%s O-A\n%s' % (stat.upper(),title_substr),fontsize='x-large',fontweight='bold')
-                else:
-                    plt.suptitle('%s O-F\n%s' % (stat.upper(),title_substr),fontsize='x-large',fontweight='bold')
+                plt.xlabel('(%s)' % var_unit,fontsize=fontsize)
             else:
-                plt.xlabel('count', fontsize=12)
-                #plt.xlabel('count (# x $\mathregular{10^%d}$)' % exponent,fontsize=12)
-                plt.suptitle('Observation Counts\n%s'%title_substr,fontsize='x-large',fontweight='bold')
+                plt.xlabel('count', fontsize=fontsize)
 
-        plt.title(var_name,fontsize='large')
-        plt.ylim(lmin,lmax)
-        ax.set_yscale('log')
-        ax.yaxis.set_major_locator(ticker.FixedLocator(indexlevs))
-        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%g"))
-        ax.yaxis.set_minor_locator(plt.NullLocator())
-        if v in [0,3]:
-            #ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0,subs=np.arange(1,10)))
-            plt.yticks(fontsize=10)
+        if len(pltvar) > 1:
+            if normalize or pairdiff:
+                    if stat == 'rms':
+                        if anl:
+                            plt.suptitle('%s O-A\n%s' % (stat.upper(),title_substr),fontsize='x-large',fontweight='bold')
+                        else:
+                            plt.suptitle('%s O-F\n%s' % (stat.upper(),title_substr),fontsize='x-large',fontweight='bold')
+                    elif stat == 'count':
+                        plt.suptitle('Normalized Observation Counts\n%s'%title_substr,fontsize='x-large',fontweight='bold')                
+            else:
+                if stat in ['rms','bias']:
+                    if anl:
+                        plt.suptitle('%s O-A\n%s' % (stat.upper(),title_substr),fontsize='x-large',fontweight='bold')
+                    else:
+                        plt.suptitle('%s O-F\n%s' % (stat.upper(),title_substr),fontsize='x-large',fontweight='bold')
+                else:
+                    plt.suptitle('Observation Counts\n%s'%title_substr,fontsize='x-large',fontweight='bold')
+    
+        plt.title(var_name,fontsize=fontsize+2)
+        if ylog:
+            plt.ylim(lmin,lmax)
+            ax.set_yscale('log')
+            ax.yaxis.set_major_locator(ticker.FixedLocator(indexlevs))
+            ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%g"))
+            ax.yaxis.set_minor_locator(plt.NullLocator())
+            if v in [0,3]:
+                #ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0,subs=np.arange(1,10)))
+                plt.yticks(fontsize=fontsize)
+            else:
+                ax.set_yticklabels([])
         else:
-            ax.set_yticklabels([])
-
+            plt.ylim(ya[0]+0.25,ya[-1]+0.5)
+            ax.yaxis.set_ticks(yb[1:])
+            ax.yaxis.set_ticklabels(indexlevs[1:])
+            plt.yticks(fontsize=fontsize)
+            
         #xmin = xmin - (xmax-xmin)*0.1
         #xmax = xmax + (xmax-xmin)*0.1
         if pairdiff:
@@ -368,30 +415,44 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
             ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%.1f"))
             ax.xaxis.set_major_locator(plt.MaxNLocator(8))
             xmin = 0 if stat in ['count'] else xmin - (xmax-xmin)*0.1
-        ax.xaxis.set_minor_locator(ticker.AutoMinorLocator(5))
-        plt.xticks(fontsize=10)
+        plt.xticks(fontsize=fontsize)
         #plt.xlim(xmin,xmax)
+
+        ax.text(0.015, 1.05, plabel,
+                verticalalignment='bottom', horizontalalignment='center',
+                transform=ax.transAxes,
+                color='black', fontsize=fontsize+2)
 
     return fig
 
 def plot_profile_FGvsANL(uv, t, q, gps, amv, scrm, uv_a, t_a, q_a, gps_a, amv_a, scrm_a,
                          expidcntl='CNTL', expid='exp',elabelc='CNTL',elabel='exp',stat='rms',
-                         normalize=False, pairdiff=False):
+                         normalize=False, pairdiff=False, ylog=False,
+                         pltvar=['uv','t','q','gps','amv','scrm']):
 
-    fig = plt.figure(figsize=(12, 8))
-    plt.subplots_adjust(top=0.875, hspace=0.3)
-    gs = gspec.GridSpec(2, 3)
+    if len(pltvar) >=5:
+        fig = plt.figure(figsize=(12, 8))
+        plt.subplots_adjust(top=0.875, hspace=0.3)
+        gs = gspec.GridSpec(2, 3)
+    else:
+        fig = plt.figure(figsize=(10, 8))
+        plt.subplots_adjust(top=0.875, hspace=0.3)
+        gs = gspec.GridSpec(2, 2)
 
     lmin,lmax = 1200,50
 
-    for v,var in enumerate(['uv','t','q','gps','amv','scrm']):
-
+    for v,var in enumerate(pltvar):
         if var == 'q':
-            indexlevs = [1200, 1000, 950, 900, 850, 800, 700, 600, 500, 400, 300]
-            levs = [1000, 950, 900, 850, 800, 700, 600, 500, 400, 300, 0]
+            indexlevs = [1200, 1000, 950, 900, 850, 800, 700, 600, 500, 400, 300, 200]
+            levs = [ 1000, 950, 900, 850, 800, 700, 600, 500, 400, 300, 200 ]
         else:
             indexlevs = [1200,1000, 900, 800, 600, 400, 300, 250, 200, 150, 100, 50]
-            levs = [ 1100, 950, 850, 700, 500, 350, 275, 225, 175, 125, 75 ]
+            levs = [1000, 900, 800, 600, 400, 300, 250, 200, 150, 100, 50]
+        ya = np.arange(len(levs))
+        yb = np.arange(len(indexlevs))
+        if not ylog:
+            lmin = yb[0]
+            lmax = yb[-1]
 
         xmin = 1.e10
         xmax = 0
@@ -479,16 +540,23 @@ def plot_profile_FGvsANL(uv, t, q, gps, amv, scrm, uv_a, t_a, q_a, gps_a, amv_a,
         if stat == 'bias':
             plt.vlines(0.,lmin,lmax,colors='k',linestyles='--',linewidth=2.0,label=None)
 
-        if pairdiff or normalize:
-            elevs = np.array(levs)
-            elevs = np.array(levs) + 5
-            if ncount > 12:
-                ax.errorbar(profilen_f, elevs, xerr=CI_95n_f, label='FG', color='b')
-                ax.errorbar(profilen_a, elevs, xerr=CI_95n_a, label='Analysis', color='r') 
+        elevs = np.array(levs) + 5
+        if ylog:
+            if stat == 'rms' and ncount >= 12:
+                yindex = elevs
             else:
-                ax.plot(profilen_f, levs, marker='o', label='FG', color='b', mfc='b', mec='b',
+                yindex = levs
+        else:
+            yindex = ya+0.5
+
+        if pairdiff or normalize:
+            if ncount > 12:
+                ax.errorbar(profilen_f, yindex, xerr=CI_95n_f, label='FG', color='b')
+                ax.errorbar(profilen_a, yindex, xerr=CI_95n_a, label='Analysis', color='r') 
+            else:
+                ax.plot(profilen_f, yindex, marker='o', label='FG', color='b', mfc='b', mec='b',
                         linewidth=2.0, alpha=alpha)
-                ax.plot(profilen_a, levs, marker='o', label='Analysis', color='r', mfc='r', mec='r',
+                ax.plot(profilen_a, yindex, marker='o', label='Analysis', color='r', mfc='r', mec='r',
                         linewidth=2.0, alpha=alpha)
 
 
@@ -515,12 +583,15 @@ def plot_profile_FGvsANL(uv, t, q, gps, amv, scrm, uv_a, t_a, q_a, gps_a, amv_a,
             if ( xmin_ < xmin ): xmin = xmin_
             if ( xmax_ > xmax ): xmax = xmax_
             
-            ax.plot(profile0_f, levs, marker='o',color='k',mfc='k',mec='k',linewidth=2.0,label='FG',alpha=alpha)
-            ax.plot(profile0_a, levs, marker='o',color='r',mfc='r',mec='r',linewidth=2.0,label='ANL',alpha=alpha)
+            ax.plot(profile0_f, yindex, marker='o',color='k',mfc='k',mec='k',linewidth=2.0,label='FG',alpha=alpha)
+            ax.plot(profile0_a, yindex, marker='o',color='r',mfc='r',mec='r',linewidth=2.0,label='ANL',alpha=alpha)
 
-        if ( v in [5] ): plt.legend(loc=0,fontsize='small',numpoints=1)
-
-        if ( v in [0,3] ): plt.ylabel('pressure (hPa)',fontsize=12)
+        if len(pltvar) >=5:
+            if ( v in [0,3] ): plt.ylabel('pressure (hPa)',fontsize=12)
+            if ( v in [5] ): plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
+        else:
+            if ( v in [0,2] ): plt.ylabel('pressure (hPa)',fontsize=12)
+            if ( v in [0] ): plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
 
         if ( var == 'uv' ):
             var_unit = 'm/s'
@@ -536,7 +607,7 @@ def plot_profile_FGvsANL(uv, t, q, gps, amv, scrm, uv_a, t_a, q_a, gps_a, amv_a,
             var_name = 'GPS'
         elif ( var == 'amv' ):
             var_unit = 'm/s'
-            var_name = 'AMVs'
+            var_name = 'AMV'
         elif (var == 'scrm' ):
             var_unit = 'm/s'
             var_name = 'Scatterometeor'
@@ -546,7 +617,7 @@ def plot_profile_FGvsANL(uv, t, q, gps, amv, scrm, uv_a, t_a, q_a, gps_a, amv_a,
                 plt.xlabel('normalized difference',fontsize=12)
                 plt.suptitle('%s O-F/O-A %s-%s\n%s' % (stat.upper(),elabel,elabelc,title_substr),fontsize='x-large',fontweight='bold')
             else:
-                plt.xlabel('(%, normalized)',fontsize=12)
+                plt.xlabel('normalized O-F rms (%)',fontsize=12)
                 plt.suptitle('%s O-F/O-A %s/%s\n%s' % (stat.upper(),elabel,elabelc,title_substr),fontsize='x-large',fontweight='bold')
         else:
             plt.xlabel('(%s)' % var_unit,fontsize=12)
@@ -554,16 +625,21 @@ def plot_profile_FGvsANL(uv, t, q, gps, amv, scrm, uv_a, t_a, q_a, gps_a, amv_a,
 
 
         plt.title(var_name,fontsize='large')
-        plt.ylim(lmin,lmax)
-        ax.set_yscale('log')
-        ax.yaxis.set_major_locator(ticker.FixedLocator(indexlevs))
-        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%g"))
-        ax.yaxis.set_minor_locator(plt.NullLocator())
-        if v in [0,3]:
-            #ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0,subs=np.arange(1,10)))
-            plt.yticks(fontsize=10)
+        if ylog:
+            plt.ylim(lmin,lmax)
+            ax.set_yscale('log')
+            ax.yaxis.set_major_locator(ticker.FixedLocator(indexlevs))
+            ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%g"))
+            ax.yaxis.set_minor_locator(plt.NullLocator())
+            if v in [0,3]:
+                #ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0,subs=np.arange(1,10)))
+                plt.yticks(fontsize=10)
+            else:
+                ax.set_yticklabels([])
         else:
-            ax.set_yticklabels([])
+            plt.ylim(ya[0],ya[-1]+1.0)
+            ax.yaxis.set_ticks(yb)
+            ax.yaxis.set_ticklabels(indexlevs)
 
         xmin = xmin - (xmax-xmin)*0.1
         xmax = xmax + (xmax-xmin)*0.1
@@ -762,7 +838,7 @@ def plot_cost_gradient(minim):
     #ax.set_xticklabels(xticklabels[:-1])
     ax.set_xlabel('Iteration Number',fontsize=12)
     ax.set_ylabel('Cost Function (x $\mathregular{10^%d}$)' % exponent,fontsize=12)
-    ax.legend(fontsize=12)
+    ax.legend(fontsize=12,frameon=False)
     ax.text(0.15, 0.85, '(a)',
             verticalalignment='bottom', horizontalalignment='center',
             transform=ax.transAxes,
@@ -809,7 +885,7 @@ def plot_cost_gradient(minim):
     ax.xaxis.set_ticklabels(xlabels)
     ax.set_xlabel('Iteration Number',fontsize=12)
     ax.set_ylabel('Norm of the Gradient',fontsize=12)
-    ax.legend(fontsize=12)
+    ax.legend(fontsize=12,frameon=False)
     ax.text(0.15, 0.85, '(b)',
             verticalalignment='bottom', horizontalalignment='center',
             transform=ax.transAxes,
@@ -863,7 +939,7 @@ def plot_Jo(minim):
     ax.set_xticklabels(xticklabels[:-1])
     ax.set_xlabel('Iteration Number',fontsize=12)
     ax.set_ylabel('Jo (x $\mathregular{10^%d}$)' % exponent,fontsize=12)
-    ax.legend(fontsize=12)
+    ax.legend(fontsize=12,frameon=False)
     ax.text(0.15, 0.85, '(a)',
             verticalalignment='bottom', horizontalalignment='center',
             transform=ax.transAxes,
@@ -1001,7 +1077,8 @@ def plot_channel(dfin,inst=''):
     lc = mc[0] if len(labels) == 1 else mc[:len(labels)]
 
     fig,ax = plt.subplots(figsize=(10,8))
-    assim.plot(ax=ax,kind='barh',logx=True,width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+    #assim.plot(ax=ax,kind='barh',logx=True,width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+    assim.plot(ax=ax,kind='barh',logx=True,width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
     titlestr = 'Assimilated: # of %s observations\n%s' % (inst.upper(),title_substr)
     ax.set_title(titlestr,fontsize='x-large')
     yticklabels_new = get_yticklabels_new(ax)
@@ -1032,7 +1109,8 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff
     lc = mc[0] if nclm == 1 else mc[:nclm]
 
     fig,ax = plt.subplots(figsize=(10,12))
-    obscount.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+    #obscount.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+    obscount.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
     titlestr = 'Assimilated: # of %s observations\n%s' % (inst.upper(),title_substr)
     ax.set_title(titlestr,fontsize='x-large')
     if len(statslvl) == 1:
@@ -1053,7 +1131,7 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff
         else:
             ax.yaxis.set_ticklabels(yindex, fontsize=8)    
         #plt.vlines(0.0,yindex[0],yindex[-1],colors='k',linestyles='-',linewidth=2.0,label=None)
-        plt.legend(loc=0,numpoints=1)
+        plt.legend(loc=0,numpoints=1,frameon=False)
         #plt.ylim(1,yindex[-1]+1)
         #plt.yticks(yindex)
     else:
@@ -1116,8 +1194,8 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
         #ax.set_title(titlestr,fontsize='x-large')
         if len(statslvl) == 1:
             ax.vlines(100.0,a[0],a[-1],colors='k',linestyles='-',linewidth=0.5,label=None)
-            if len(labels) > 2:
-                ax.legend(loc=0,numpoints=1,fontsize=10)
+            if len(labels) > 1:
+                ax.legend(loc=0,numpoints=1,fontsize=10,frameon=False)
             #ax.xaxis.set_major_locator(plt.MaxNLocator(7))
             ax.xaxis.set_tick_params(labelsize=8)
             ax.xaxis.set_major_formatter(ticker.FormatStrFormatter('%.2f'))
@@ -1230,8 +1308,8 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
                 else:
                     ax.errorbar(tomfstdwci[[column_std]].values[:,0], a, xerr=tomfstdwci[[column_ci95]].values[:,0],color=mc[e],
                                 label=expid)
-        if len(labels) > 2:
-            ax.legend(loc=0,numpoints=1,fontsize=10)
+        if len(labels) > 1:
+            ax.legend(loc=0,numpoints=1,fontsize=10,frameon=False)
         ax.xaxis.set_tick_params(labelsize=8)
         if inst == 'airs' or inst == 'iasi' or 'cris' in inst: 
             ax.yaxis.set_ticks(a[::5])
@@ -1256,7 +1334,8 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
                     transform=ax.transAxes,
                     color='black', fontsize=12)
     else:
-        stddiff.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+        #stddiff.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+        stddiff.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
         yticklabels_new = get_yticklabels_new(ax)
         ax.set_yticklabels(yticklabels_new,fontsize=8)
 
@@ -1286,7 +1365,8 @@ def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel'],wndic=None)
     lc = mc[0] if len(labels) == 1 else mc[:len(labels)]
 
     fig,ax = plt.subplots(figsize=(10,8))
-    omfbc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+    #omfbc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+    omfbc.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
     titlestr = 'OmF bias w BC of %s observations\n%s' % (inst.upper(),title_substr)
     ax.set_title(titlestr,fontsize='x-large')
 
@@ -1312,7 +1392,7 @@ def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel'],wndic=None)
     if len(statslvl) == 1:
         #yindex=omfbc.index.get_level_values('channel')
         #plt.vlines(0.0,yindex[0],yindex[-1],colors='k',linestyles='--',linewidth=2.0,label=None)
-        plt.legend(loc=0,numpoints=1)
+        plt.legend(loc=0,numpoints=1,frameon=False)
         #plt.ylim(0,yindex[-1]+1)
         #plt.yticks(yindex)
     else:
@@ -1340,7 +1420,8 @@ def plot_channel_omfwobc(dfin,inst='',statslvl=['satellite','channel'],wndic=Non
     lc = mc[0] if len(labels) == 1 else mc[:len(labels)]
 
     fig,ax = plt.subplots(figsize=(10,8))
-    omfwobc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+    #omfwobc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+    omfwobc.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
     #with pd.option_context('display.max_rows', None, 'display.max_columns', None):
     #    print (omfwobc)
     yindex=omfwobc.index.values.tolist()
@@ -1368,7 +1449,7 @@ def plot_channel_omfwobc(dfin,inst='',statslvl=['satellite','channel'],wndic=Non
     if len(statslvl) == 1:
         #yindex=omfwobc.index.get_level_values('channel')
         #plt.vlines(0.0,yindex[0],yindex[-1],colors='k',linestyles='--',linewidth=2.0,label=None)
-        plt.legend(loc=0,numpoints=1)
+        plt.legend(loc=0,numpoints=1,frameon=False)
         #plt.ylim(0,yindex[-1]+1)
         #plt.yticks(yindex)
         #plt.ylabel('Channel',fontsize=12)
@@ -1391,7 +1472,8 @@ def plot_channel_omfbias(dfin,inst='',wndic=None):
         #omfbc.rename(columns={'OmF_wobc': labels[e]+'bfbc', 'OmF_bc': labels[e]+'afbc'}, inplace=True)
         lc = mc[:2]
         fig,ax = plt.subplots(figsize=(10,8))
-        omfbc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+        #omfbc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+        omfbc.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
         yindex=omfbc.index.values.tolist()
         if wndic is not None:
             y2index=[]
@@ -1507,7 +1589,7 @@ def plot_channel_omf_FGvsANL(dfin,dfin2,dfin3,stats='std',inst='',wndic=None):
             ax.yaxis.set_ticklabels(yindex)
         ax.yaxis.set_tick_params(labelsize=8)
         if e == 0:
-            ax.legend(loc=0,numpoints=1,fontsize=10)
+            ax.legend(loc=0,numpoints=1,fontsize=10,frameon=False)
         if e == 0 or e == 3:
             ax.set_ylabel(yaxislabel,fontsize=10)
         if stats == 'std':
@@ -1677,6 +1759,11 @@ if __name__ == '__main__':
     parser.add_argument('-scyc','--singe_cycle',help='single cycle from run directory',action='store_true',required=False)
     parser.add_argument('-randomcyc','--random_cycle',help='random cycles',action='store_true',required=False)
     parser.add_argument('-cycfreq','--cycle_freq',help='cycle frequency',type=str,required=False,default='6H')
+    parser.add_argument('-pltvar','--pltvar',help='variables to plot',nargs='+',required=False, default=['uv','t','q','gps','amv','scrm'])
+    parser.add_argument('-ylog','--ylog',help='log for y axis',action='store_true',required=False)
+    parser.add_argument('-lclr','--linecolors',help='line colors',nargs='+',required=False, default=['k', 'b', 'r', 'g', 'm','c','y'])
+    parser.add_argument('-style','--panelstyle',help='panel style',type=str,required=False,default='nappend')
+    parser.add_argument('-nlegend','--no_legend',help='plot legend',action='store_true',required=False)
 
     args = parser.parse_args()
 
@@ -1707,6 +1794,11 @@ if __name__ == '__main__':
     plot_costgJo = args.plot_costgJo
     plot_oz = args.plot_oz
     plot_rad = args.plot_rad
+    pltvar = args.pltvar
+    style = args.panelstyle
+    nlegend = args.no_legend
+    ylog = args.ylog
+    mc = args.linecolors
 
     if ( edate < bdate ):
         print ('start date cannot be after end date, switching!')
@@ -1733,23 +1825,22 @@ if __name__ == '__main__':
     #         270,271,280,281,282,283,284,285,286,287,288,291,292,293,294,295]
     #uvtyp = [220,221,230,231,232,233,280,282]
     if plot_cnvall:
-        uvtyp = [220,221,229,230,231,232,233,234]
+        uvtyp = [220,221,223,229,230,231,232,233,234,280,282,289,290]
     else:
         #uvtyp = [230,231,232,233,234,235,236]
         uvtyp = [220]
         #uvtyp = [221,229]
-    #ttyp = [120,130,131,132,133,180,182]
-    #ttyp = [120,180,182]
-    ttyp = [120]
-    #ttyp = [130,131,132,133,134,135,136]
-    #qtyp = [120,131,133,134,180,182]
-    #qtyp = [120,180,182]
-    qtyp = [120]
+        #uvtyp = [220,221,229,223,229,280,282,289,290]
+        #ttyp = [120,180,182]
+        ttyp = [120]
+        #ttyp = [130,131,132,133,134,135,136]
+        #qtyp = [120,131,133,134,180,182]
+        #qtyp = [120,180,182]
+        qtyp = [120]
     #qtyp = [130,131,132,133,134,135,136]
     #gpstyp = [004,722,745,042,043,003]
     #amvtyp = [240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260]
     amvtyp = [242, 243, 244, 245, 246, 247, 250, 252, 253, 254, 257, 258, 259, 260]
-    #scrmtyp = [289, 290]
     scrmtyp = [280, 282, 289, 290]
 
     for expid,label,mode,cdump,archdir in zip(expids,labels,modes,cdumps,archdirs):
@@ -1848,7 +1939,7 @@ if __name__ == '__main__':
 
     # Start plotting
 
-    mc = ['k', 'r', 'g', 'b', 'm','c','y']
+    #mc = ['k', 'r', 'g', 'm','c','y']
     alpha = 0.8
 
     if random_cycle:
@@ -1870,23 +1961,36 @@ if __name__ == '__main__':
             fig = plot_ps(ps,pname='ps') ; figs.append(fig) ; fignames.append('ps')
             #fig = plot_ps(tcp,pname='tcp') ; figs.append(fig) ; fignames.append('tcp')
       
-        fig = plot_profile(uv,t,q,gps,amv,scrm,stat='bias') ; figs.append(fig) ; fignames.append('bias')
+        fig = plot_profile(uv,t,q,gps,amv,scrm,stat='bias',pltvar=pltvar,ylog=ylog,nlegend=nlegend) 
+        figs.append(fig) ; fignames.append('bias')
         if plot_anl:
-            fig = plot_profile(uv_a,t_a,q_a,gps_a,amv_a,scrm_a,stat='bias',anl=True) ; figs.append(fig) ; fignames.append('bias_anl')
+            fig = plot_profile(uv_a,t_a,q_a,gps_a,amv_a,scrm_a,stat='bias',anl=True,pltvar=pltvar,ylog=ylog,
+                               nlegend=nlegend) 
+            figs.append(fig) ; fignames.append('bias_anl')
     
         if len(expids) > 1 and nfile >= 1:
-            #fig = plot_profile(uv,t,q,gps,amv,scrm,stat='count',diffsum=True) 
-            fig = plot_profile(uv,t,q,gps,amv,scrm,stat='count',normalize=True)
+            fig = plot_profile(uv,t,q,gps,amv,scrm,stat='count',normalize=True,pltvar=pltvar,ylog=ylog,
+                               nlegend=nlegend)
             figs.append(fig) ; fignames.append('countn')	
-            fig = plot_profile(uv,t,q,gps,amv,scrm,stat='rms',normalize=True) 
-            figs.append(fig) ; fignames.append('rmsn')
+            if style == 'single':
+                for var in pltvar:
+                    fig = plot_profile(uv,t,q,gps,amv,scrm,stat='rms',normalize=True,pltvar=[var],ylog=ylog,
+                                       nlegend=nlegend)
+                    figs.append(fig) ; fignames.append(f'rmsn_{var}')
+            else:
+                fig = plot_profile(uv,t,q,gps,amv,scrm,stat='rms',normalize=True,pltvar=pltvar,ylog=ylog,
+                                   nlegend=nlegend)
+                figs.append(fig) ; fignames.append('rmsn')
             if plot_anl:
-                fig = plot_profile(uv_a,t_a,q_a,gps_a,amv_a,scrm_a,stat='rms',anl=True,normalize=True)
+                fig = plot_profile(uv_a,t_a,q_a,gps_a,amv_a,scrm_a,stat='rms',anl=True,normalize=True,
+                                   pltvar=pltvar,ylog=ylog,nlegend=nlegend)
                 figs.append(fig) ; fignames.append('rmsn_anl')
         else:
-            fig = plot_profile(uv,t,q,gps,amv,scrm,stat='rms') ; figs.append(fig) ; fignames.append('rms')
+            fig = plot_profile(uv,t,q,gps,amv,scrm,stat='rms',pltvar=pltvar,ylog=ylog)
+            figs.append(fig) ; fignames.append('rms')
             if plot_anl:
-                fig = plot_profile(uv_a,t_a,q_a,gps_a,amv_a,scrm_a,stat='rms',anl=True) 
+                fig = plot_profile(uv_a,t_a,q_a,gps_a,amv_a,scrm_a,stat='rms',anl=True,pltvar=pltvar,
+                                   ylog=ylog,nlegend=nlegend) 
                 figs.append(fig) ; fignames.append('rms_anl')
 
 
@@ -1907,19 +2011,19 @@ if __name__ == '__main__':
         for e, expid in enumerate(labels):
             fig = plot_profile_FGvsANL(uv, t, q, gps, amv, scrm, uv_a, t_a, q_a, gps_a, amv_a, scrm_a,
                                        expidcntl=labels[0],expid=expid,elabelc=labels[0],elabel=labels[e],
-                                       stat='rms',normalize=False)
+                                       stat='rms',normalize=False,pltvar=pltvar,ylog=ylog)
             figs.append(fig)
             fignames.append('rms_FGvANL_%s'%(expid))
             if e > 0:
                 fig = plot_profile_FGvsANL(uv, t, q, gps, amv, scrm, uv_a, t_a, q_a, gps_a, amv_a, scrm_a,
                                            expidcntl=labels[0],expid=expid,elabelc=labels[0],elabel=labels[e],
-                                           stat='rms',normalize=True)
+                                           stat='rms',normalize=True,pltvar=pltvar,ylog=ylog)
                 figs.append(fig)
                 fignames.append('rms_FGvANL_norm_%s'%(expid))
     
             fig = plot_profile_FGvsANL(uv, t, q, gps, amv, scrm, uv_a, t_a, q_a, gps_a, amv_a, scrm_a,
                                        expidcntl=labels[0],expid=expid,elabelc=labels[0],elabel=labels[e],
-                                       stat='bias')
+                                       stat='bias',pltvar=pltvar,ylog=ylog)
             figs.append(fig)
             fignames.append('bias_FGvANL_%s'%(expid))
         
@@ -1937,7 +2041,7 @@ if __name__ == '__main__':
                 instid = inst
                 if 'cris' in inst:
                     instid = 'cris'
-                wndic=pd.read_csv(f'{csvdir}/wavenumber_{instid}.csv',header=None,index_col=0,squeeze=True).to_dict()
+                wndic=pd.read_csv(f'{csvdir}/wavenumber_{instid}.csv',header=None,index_col=0).squeeze("columns").to_dict()
             else:
                 wndic=None
             if len(insts[inst]) != 0:
