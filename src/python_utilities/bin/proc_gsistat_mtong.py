@@ -31,9 +31,9 @@ def _float10Power(value):
     e = np.ceil(e) - 1. if e >= 0 else np.floor(e)
     return e
 
-def get_data1(gsistat,varname,it=1,use='asm',typ='all'):
+def get_data1(gsistat,varname,it=1,use='asm',typ='all',subtypsum=False):
     df = []
-    for i in gsistat:
+    for ni, i in enumerate(gsistat):
         tmp = i.extract(varname)
         if tmp.empty:
             print ('missing %s %s'%(varname, i.analysis_date.strftime('%Y%m%d%H')))
@@ -54,11 +54,51 @@ def get_data1(gsistat,varname,it=1,use='asm',typ='all'):
                 #        print '%s is not present in %s' % (t, i.analysis_date.strftime('%Y%m%d%H'))
                 tmp = pd.concat(tmp2)
 
+            if ni == 0:
+                print (f'{varname} initial sub types')
+                if type(typ) is list:
+                    print (list(set(typ)))
+                else:
+                    print ('all')
+                print (f'{varname} sub types')
+                subtypes=np.unique(tmp.index.get_level_values('typ').values)
+                print (subtypes)
+            
+            if not subtypsum and len(subtypes) > 1:
+                if varname in ['ps', 'sst', 'tcp']:
+                    count = tmp['count']
+                    omf2 = tmp['rms']*tmp['rms']*tmp['count']
+                    omfsum = tmp['bias']*tmp['count']
+                    tmpa = pd.concat([count,omfsum,omf2],keys=['count','bias', 'rms'],axis=1)
+                if varname in ['uv', 't', 'q', 'gps', 'amv']:
+                    rms=tmp.xs('rms', axis=0, level='stat', drop_level=True)
+                    bias=tmp.xs('bias', axis=0, level='stat', drop_level=True)
+                    count=tmp.xs('count', axis=0, level='stat', drop_level=True)
+                    omf2 = (rms*rms*count).assign(stat='rms').set_index('stat', append=True)
+                    omfsum = (bias*count).assign(stat='bias').set_index('stat', append=True)
+                    count=count.assign(stat='count').set_index('stat', append=True)
+                    tmpa = pd.concat([count,omfsum,omf2],axis=0)
+
             """ sum over data types """
             if varname in ['ps', 'sst', 'tcp']:
-                tmp = tmp.groupby(level=['date','it','obs','use']).sum()
+                if subtypsum or len(subtypes) == 1:
+                    tmp = tmp.groupby(level=['date','it','obs','use']).sum()
+                else:
+                    tmp = tmpa.groupby(level=['date','it','obs','use']).sum()
+                    tmp['rms'] = np.sqrt(tmp['rms']/tmp['count'])
+                    tmp['bias'] = tmp['bias']/tmp['count']
             elif varname in ['uv', 't', 'q', 'gps', 'amv']:
-                tmp = tmp.groupby(level=['date','it','obs','use','stat']).sum()
+                if subtypsum or len(subtypes) == 1:
+                    tmp = tmp.groupby(level=['date','it','obs','use','stat']).sum()
+                else:
+                    tmp = tmpa.groupby(level=['date','it','obs','use','stat']).sum()
+                    rms = tmp.xs('rms', axis=0, level='stat')
+                    bias = tmp.xs('bias', axis=0, level='stat')
+                    count = tmp.xs('count', axis=0, level='stat')
+                    rms = np.sqrt(rms/count).assign(stat='rms').set_index('stat', append=True)
+                    bias = (bias/count).assign(stat='bias').set_index('stat', append=True)
+                    count=count.assign(stat='count').set_index('stat', append=True)
+                    tmp = pd.concat([count,bias,rms],axis=0)
             else:
                 msg = 'get_data1: varname %s is not a valid variable\n' % varname
                 msg += 'try: ps, uv, t, q'
@@ -141,6 +181,8 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                  pairdiff=False, diffsum=False, ylog=False, nlegend=False,
                  pltvar=['uv','t','q','gps','amv','scrm']):
 
+    if 'ps' in pltvar:
+        pltvar.remove('ps')
     fontsize=12
     lw=2.0
     if len(pltvar) >=5:
@@ -186,25 +228,18 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
         xmax = 0
         ax = plt.subplot(gs[v])
 
-        #cntldf=data_dict[labels[0]].xs(stat, level='stat', drop_level=False)
-        #count_cntl=data_dict[labels[0]].xs('count', level='stat', drop_level=False)
         cntldf=data_dict[labels[0]].xs(stat, level='stat')
         count_cntl=data_dict[labels[0]].xs('count', level='stat')
-        #cntldf.where(count_cntl > 0, np.nan, inplace=True) 
         ncount = cntldf.shape[0]
         """ [:-1] remove whole column [0:2000] stats"""
         profilec=cntldf.mean()[:-1].values
         for e,expid in enumerate(labels):
-            #expdf=data_dict[expid].xs(stat, level='stat', drop_level=False)
             expdf=data_dict[expid].xs(stat, level='stat')
 
             profile = expdf.mean()[:-1].values
             if diffsum:
                 diff=expdf.sub(cntldf,axis=1) 
                 profile0 = diff.sum()[:-1].values
-                #print ('diffsum')
-                #print diff
-                #print (var, profile0)
             elif pairdiff:
                 diff=expdf.sub(cntldf,axis=1)
                 if ncount < 12:
@@ -224,9 +259,6 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                 else:
                     profile=expdf.apply(mean_confidence_interval).values
 
-            """if var == 't' and stat == 'rms':
-                print 'profile'
-                print profile """
             if ncount >= 12 and not diffsum:
                 if profile.ndim == 1:
                     profile0=np.array([x[0] for x in profile[:-1] ])
@@ -244,11 +276,7 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                 if ncount >= 12:
                     CI_95n = CI_95*100.
     
-            #countprofile=data_dict[expid].xs('count', level='stat', drop_level=False).mean()[:-1].values
             countprofile=data_dict[expid].xs('count', level='stat').mean()[:-1].values
-            #if pairdiff:
-            #    print 'countprofile'
-            #    print countprofile
             profile0[countprofile == 0.0]=np.nan
             if ncount >= 12 and not diffsum:
                 CI_95[countprofile == 0.0]=np.nan
@@ -303,8 +331,6 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                 plt.vlines(0.,lmin,lmax,colors='k',linestyles='--',linewidth=lw,label=None)
     
             if (normalize or pairdiff) and ncount >= 12:
-                #print profilen.shape, profilen
-                #print CI_95n.shape, CI_95n
                 tmp1=profilen[~np.isnan(profilen)]
                 if ncount >= 12:
                     tmp2=CI_95n[~np.isnan(CI_95n)]
@@ -312,11 +338,6 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                     xmin_,xmax_ = np.min(tmp1-tmp2),np.max(tmp1+tmp2) 
                 else:
                     xmin_,xmax_ = np.min(tmp1),np.max(tmp1)
-            #else:
-            #    print profile0[~np.isnan(profile0)]
-            #    xmin_,xmax_ = np.min(profile0[~np.isnan(profile0)]), np.max(profile0[~np.isnan(profile0)])
-            #if ( xmin_ < xmin ): xmin = xmin_
-            #if ( xmax_ > xmax ): xmax = xmax_
     
         if len(pltvar) >=5:
             if ( v in [0,3] ): plt.ylabel('Pressure (hPa)',fontsize=fontsize)
@@ -429,6 +450,9 @@ def plot_profile_FGvsANL(uv, t, q, gps, amv, scrm, uv_a, t_a, q_a, gps_a, amv_a,
                          expidcntl='CNTL', expid='exp',elabelc='CNTL',elabel='exp',stat='rms',
                          normalize=False, pairdiff=False, ylog=False,
                          pltvar=['uv','t','q','gps','amv','scrm']):
+     
+    if 'ps' in pltvar:
+        pltvar.remove('ps')
 
     if len(pltvar) >=5:
         fig = plt.figure(figsize=(12, 8))
@@ -460,8 +484,6 @@ def plot_profile_FGvsANL(uv, t, q, gps, amv, scrm, uv_a, t_a, q_a, gps_a, amv_a,
 
         data_dictf = eval(var)
         data_dicta = eval(var+'_a')
-
-        #print (data_dictf)
 
         cntldf_f=data_dictf[expidcntl].xs(stat, level='stat', drop_level=False)
         profilec_f=cntldf_f.mean()[:-1].values
@@ -820,8 +842,6 @@ def plot_cost_gradient(minim):
     it2idx = df.xs(2, level='Outer').index.get_level_values('Inner')
     xticks = xticks + a[iouter+25:][::25].tolist()
     xlabels = xlabels + xindex[iouter+25:][::25].tolist()
-    #print ('xtick', xticks)
-    #print ('xlabels', xlabels)
     ax.xaxis.set_ticks(xticks)
     ax.xaxis.set_ticklabels(xlabels)
     # This is needed to show the second+ outerloops with correct indices
@@ -921,13 +941,11 @@ def plot_Jo(minim):
     df = pd.concat(tmpdf,axis=1) / np.power(10,exponent)
     df2 = pd.concat(tmpdf2,axis=1) / np.power(10,exponent)
 
-    #print (df)
     df.plot(ax=ax,kind='line',linewidth=2.,alpha=alpha,color=lc)
 
     # This is needed to show the second+ outerloops with correct indices
     xticks = ax.get_xticks()
     xticklabels = [item.get_text() for item in ax.get_xticklabels()]
-    #print (xticklabels)
     for i, (xtick,xticklabel) in enumerate(zip(xticks,xticklabels)):
         tmp = str(xticklabel)
         if tmp:
@@ -973,12 +991,10 @@ def get_yticklabels_new(ax):
 def get_xticklabels_new(ax):
 
     xticklabels = ax.get_xticklabels()
-    #print xticklabels
     xticklabels_new = []
     instp = None
     for l,lab in enumerate(xticklabels):
         lab = str(lab.get_text())
-        #print 'lab=', lab
         inst,sat = lab.replace('(','').replace(')','').split(',')
         if inst == instp:
             new_label = sat
@@ -1040,8 +1056,6 @@ def plot_sat_diff(dfin,otype=''):
     read = pd.concat(read,axis=1)
     keep = pd.concat(keep, axis=1)
     assim= pd.concat(assim,axis=1)
-    #print ('oz assim')
-    #print (assim)
     if assim.iloc[:,0].sum() > 0:
         tmp = assim.div(assim.iloc[:,0],axis='index') * 100.0 - 100.0
         nobsdiff = tmp.drop(tmp.columns[0],axis=1)
@@ -1118,7 +1132,6 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff
         if wndic is not None:
             y2index=[]
             for ch in yindex:
-                #print (ch, int(wndic[ch]))
                 y2index.append(f'{ch}, {int(wndic[ch])}')
             yindex = y2index
             ax.set_ylabel('Channel, Wavenumber $(cm^{-1})$',fontsize=10)
@@ -1171,11 +1184,8 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
             assim.append(tmp2)
 
         assim = pd.concat(assim,axis=1).dropna()
-        #print 'assim', assim
         tmp = assim.div(assim.iloc[:,0],axis='index') * 100.0
-        #print 'tmp', tmp
         nobsdiff = tmp.drop(tmp.columns[0],axis=1)
-        #print nobsdiff
         nclm = len(nobsdiff.columns)
     
         lc = mc[0] if nclm == 1 else mc[:nclm]
@@ -1186,12 +1196,10 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
         for e,expid in enumerate(labels):
             if e > 0:
                 profile  = nobsdiff[labels[e]].values
-                #print profile
                 a = np.arange(len(yindex))
                 ax.plot(profile, a, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
                         linewidth=2.0, alpha=alpha)
         titlestr = 'Assimilated: # of %s observations\n%s' % (inst.upper(),title_substr)
-        #ax.set_title(titlestr,fontsize='x-large')
         if len(statslvl) == 1:
             ax.vlines(100.0,a[0],a[-1],colors='k',linestyles='-',linewidth=0.5,label=None)
             if len(labels) > 1:
@@ -1227,8 +1235,7 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
 
     omfstd = []; CI_95 = []
     cntldf=dfin[labels[0]][['OmFbc_std']].astype(float)
-    print ('cntldf')
-    print (cntldf)
+    #print (cntldf)
     #cntldf=cntldf.dropna()
     if dfina is not None:
         cntldfa=dfina[labels[0]][['OmFbc_std']].astype(float)
@@ -1246,9 +1253,6 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
             print ('normdf')
             print (normdf)
             #normdf=normdf.dropna()
-            """with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-                print expid
-                print normdf"""
             normdf['OmFbc_std']=normdf['OmFbc_std']*100.0
             #profile=normdf.groupby(expdf.index).apply(mean_confidence_interval)
             #profile=normdf.groupby(level=['satellite','channel']).apply(mean_confidence_interval)
@@ -1414,18 +1418,12 @@ def plot_channel_omfwobc(dfin,inst='',statslvl=['satellite','channel'],wndic=Non
         omfwobc.append(tmp2)
 
     omfwobc = pd.concat(omfwobc,axis=1)
-    #omfwobc = omfwobc.div(omfwobc.iloc[:,0],axis='index') - 1.0
-    #print ('OmF bias')
 
     lc = mc[0] if len(labels) == 1 else mc[:len(labels)]
 
     fig,ax = plt.subplots(figsize=(10,8))
-    #omfwobc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
     omfwobc.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
-    #with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-    #    print (omfwobc)
     yindex=omfwobc.index.values.tolist()
-    #print (len(yindex), yindex)
     a = np.arange(len(yindex))
     if wndic is not None:
         y2index=[]
@@ -1743,6 +1741,7 @@ if __name__ == '__main__':
     parser.add_argument('-d','--dump',help='forecast type gfs or gdas',type=str,nargs='+',required=False,default='gdas')
     parser.add_argument('-e','--end_date',help='ending date',type=str,metavar='YYYYMMDDHH',default=None,required=False)
     parser.add_argument('-a','--archive_dir',help='archive directory',type=str,nargs='+',required=False,default=['/da/noscrub/%s/archive'%os.environ['USER']])
+    parser.add_argument('-subtypsum','--subtypsum',help='sum stats of subset of types',action='store_true',required=False)
     parser.add_argument('-l','--label',help='list of labels for experiment IDs',nargs='+',required=False)
     parser.add_argument('-m','--mode',help='gsi or enkf',type=str,nargs='+',required=False,default='gsi',)
     parser.add_argument('-s','--save_figure',help='save figures as png and pdf',action='store_true',required=False)
@@ -1759,7 +1758,7 @@ if __name__ == '__main__':
     parser.add_argument('-scyc','--singe_cycle',help='single cycle from run directory',action='store_true',required=False)
     parser.add_argument('-randomcyc','--random_cycle',help='random cycles',action='store_true',required=False)
     parser.add_argument('-cycfreq','--cycle_freq',help='cycle frequency',type=str,required=False,default='6H')
-    parser.add_argument('-pltvar','--pltvar',help='variables to plot',nargs='+',required=False, default=['uv','t','q','gps','amv','scrm'])
+    parser.add_argument('-pltvar','--pltvar',help='variables to plot',nargs='+',required=False, default=['uv','t','q','gps','amv','scrm','ps'])
     parser.add_argument('-ylog','--ylog',help='log for y axis',action='store_true',required=False)
     parser.add_argument('-lclr','--linecolors',help='line colors',nargs='+',required=False, default=['k', 'b', 'r', 'g', 'm','c','y'])
     parser.add_argument('-style','--panelstyle',help='panel style',type=str,required=False,default='nappend')
@@ -1773,6 +1772,7 @@ if __name__ == '__main__':
     archdirs = args.archive_dir
     if not type(archdirs) is list:
         archdirs = [archdirs]
+    subtypsum = args.subtypsum
     save_figure = args.save_figure
     plot_conv = args.plot_conv
     plot_cnvall = args.plot_cnvall
@@ -1820,26 +1820,20 @@ if __name__ == '__main__':
 
     ps_a, tcp_a, uv_a, t_a, q_a, sst_a, gps_a, amv_a, scrm_a =  {}, {}, {}, {}, {}, {}, {}, {}, {}
 
-    pstyp = [120,180,181,187]
-    #uvtyp = [220,221,222,223,224,227,228,229,230,231,232,233,234,235,
-    #         270,271,280,281,282,283,284,285,286,287,288,291,292,293,294,295]
-    #uvtyp = [220,221,230,231,232,233,280,282]
     if plot_cnvall:
-        uvtyp = [220,221,223,229,230,231,232,233,234,280,282,289,290]
+        uvtyp = [220,221,223,229,230,231,232,233,234,235,236,280,282,289,290]
     else:
+        uvtyp = [220,221,223,229,230,231,232,233,234,235,236,280,282,289,290]
+        ttyp = [120,132,180,182]
+        qtyp = [120,132,180,182]
+        """ rawwinsonde """
+        #uvtyp = [220]
+        #ttyp = [120]
+        #qtyp = [120]
+        """ aircraft """
         #uvtyp = [230,231,232,233,234,235,236]
-        uvtyp = [220]
-        #uvtyp = [221,229]
-        #uvtyp = [220,221,229,223,229,280,282,289,290]
-        #ttyp = [120,180,182]
-        ttyp = [120]
         #ttyp = [130,131,132,133,134,135,136]
-        #qtyp = [120,131,133,134,180,182]
-        #qtyp = [120,180,182]
-        qtyp = [120]
-    #qtyp = [130,131,132,133,134,135,136]
-    #gpstyp = [004,722,745,042,043,003]
-    #amvtyp = [240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260]
+        #qtyp = [130,131,132,133,134,135,136]
     amvtyp = [242, 243, 244, 245, 246, 247, 250, 252, 253, 254, 257, 258, 259, 260]
     scrmtyp = [280, 282, 289, 290]
 
@@ -1878,33 +1872,56 @@ if __name__ == '__main__':
                 nfile =+ 1
     
         if plot_conv:
-            #ps[label] = get_data1(gsistat[label],'ps',it=1,use='asm',typ=pstyp)
-            ps[label] = get_data1(gsistat[label],'ps',it=1,use='asm',typ='all')
+            if 'ps' in pltvar:
+                ps[label] = get_data1(gsistat[label],'ps',it=1,use='asm',typ='all',subtypsum=subtypsum)
             """ only turn on sst when NSST is turned on """
-            #sst[label] = get_data1(gsistat[label],'sst',it=1,use='asm',typ='all')
-            tcp[label] = get_data1(gsistat[label],'tcp',it=1,use='asm',typ='all')
-            uv[label] = get_data1(gsistat[label],'uv',it=1,use='asm',typ=uvtyp)
+            #sst[label] = get_data1(gsistat[label],'sst',it=1,use='asm',typ='all',subtypsum=subtypsum)
+            if 'tcp' in pltvar:
+                tcp[label] = get_data1(gsistat[label],'tcp',it=1,use='asm',typ='all',subtypsum=subtypsum)
             if plot_cnvall:
-                t[label] = get_data1(gsistat[label],'t',it=1,use='asm',typ='all')
-                q[label] = get_data1(gsistat[label],'q',it=1,use='asm',typ='all')
+                if 't' in pltvar:
+                    t[label] = get_data1(gsistat[label],'t',it=1,use='asm',typ='all',subtypsum=subtypsum)
+                if 'q' in pltvar:
+                    q[label] = get_data1(gsistat[label],'q',it=1,use='asm',typ='all',subtypsum=subtypsum)
             else:
-                t[label] = get_data1(gsistat[label],'t',it=1,use='asm',typ=ttyp)
-                q[label] = get_data1(gsistat[label],'q',it=1,use='asm',typ=qtyp)
-            gps[label] = get_data1(gsistat[label],'gps',it=1,use='asm',typ='all')
-            amv[label] = get_data1(gsistat[label],'uv',it=1,use='asm',typ=amvtyp)
-            scrm[label] = get_data1(gsistat[label],'uv',it=1,use='asm',typ=scrmtyp)
+                if 't' in pltvar:
+                    t[label] = get_data1(gsistat[label],'t',it=1,use='asm',typ=ttyp,subtypsum=subtypsum)
+                if 'q' in pltvar:
+                    q[label] = get_data1(gsistat[label],'q',it=1,use='asm',typ=qtyp,subtypsum=subtypsum)
+            if 'uv' in pltvar:
+                uv[label] = get_data1(gsistat[label],'uv',it=1,use='asm',typ=uvtyp,subtypsum=subtypsum) 
+            if 'amv' in pltvar:
+                print ('amv')
+                amv[label] = get_data1(gsistat[label],'uv',it=1,use='asm',typ=amvtyp,subtypsum=subtypsum)
+            if 'scrm' in pltvar:
+                print ('scrm')
+                scrm[label] = get_data1(gsistat[label],'uv',it=1,use='asm',typ=scrmtyp,subtypsum=subtypsum)
+            if 'gps' in pltvar:
+                gps[label] = get_data1(gsistat[label],'gps',it=1,use='asm',typ='all',subtypsum=subtypsum)
 
             if plot_anl or plot_fganl:
-                ps_a[label] = get_data1(gsistat[label],'ps',it=3,use='asm',typ='all')
-                tcp_a[label] = get_data1(gsistat[label],'tcp',it=3,use='asm',typ='all')
-                uv_a[label] = get_data1(gsistat[label],'uv',it=3,use='asm',typ=uvtyp)
-                t_a[label] = get_data1(gsistat[label],'t',it=3,use='asm',typ='all')
-                q_a[label] = get_data1(gsistat[label],'q',it=3,use='asm',typ='all')
-                #t_a[label] = get_data1(gsistat[label],'t',it=3,use='asm',typ=ttyp)
-                #q_a[label] = get_data1(gsistat[label],'q',it=3,use='asm',typ=qtyp)
-                gps_a[label] = get_data1(gsistat[label],'gps',it=3,use='asm',typ='all')
-                amv_a[label] = get_data1(gsistat[label],'uv',it=3,use='asm',typ=amvtyp)
-                scrm_a[label] = get_data1(gsistat[label],'uv',it=3,use='asm',typ=scrmtyp)
+                if 'ps' in pltvar:
+                    ps_a[label] = get_data1(gsistat[label],'ps',it=3,use='asm',typ='all',subtypsum=subtypsum)
+                if 'tcp' in pltvar:
+                    tcp_a[label] = get_data1(gsistat[label],'tcp',it=3,use='asm',typ='all',subtypsum=subtypsum)
+                if plot_cnvall:
+                    if 't' in pltvar:
+                        t_a[label] = get_data1(gsistat[label],'t',it=3,use='asm',typ='all',subtypsum=subtypsum)
+                    if 'q' in pltvar:
+                        q_a[label] = get_data1(gsistat[label],'q',it=3,use='asm',typ='all',subtypsum=subtypsum)
+                else:
+                    if 't' in pltvar:
+                        t_a[label] = get_data1(gsistat[label],'t',it=3,use='asm',typ=ttyp,subtypsum=subtypsum)
+                    if 'q' in pltvar:
+                        q_a[label] = get_data1(gsistat[label],'q',it=3,use='asm',typ=qtyp,subtypsum=subtypsum)
+                if 'uv' in pltvar:
+                    uv_a[label] = get_data1(gsistat[label],'uv',it=3,use='asm',typ=uvtyp,subtypsum=subtypsum)
+                if 'amv' in pltvar:
+                    amv_a[label] = get_data1(gsistat[label],'uv',it=3,use='asm',typ=amvtyp,subtypsum=subtypsum)
+                if 'scrm' in pltvar:
+                    scrm_a[label] = get_data1(gsistat[label],'uv',it=3,use='asm',typ=scrmtyp,subtypsum=subtypsum)
+                if 'gps' in pltvar:
+                    gps_a[label] = get_data1(gsistat[label],'gps',it=3,use='asm',typ='all',subtypsum=subtypsum)
 
         if plot_costg or plot_costgJo:
             minim[label] = get_data2(gsistat[label],'cost')
@@ -1954,12 +1971,16 @@ if __name__ == '__main__':
 
     if plot_conv:
 
-        if plot_anl:
-            fig = plot_ps(ps,ps2=ps_a,pname='ps') ; figs.append(fig) ; fignames.append('ps')
-            #fig = plot_ps(tcp,ps2=tcp_a,pname='tcp'); figs.append(fig) ; fignames.append('tcp')
-        else:
-            fig = plot_ps(ps,pname='ps') ; figs.append(fig) ; fignames.append('ps')
-            #fig = plot_ps(tcp,pname='tcp') ; figs.append(fig) ; fignames.append('tcp')
+        if 'ps' in pltvar:
+            if plot_anl:
+                fig = plot_ps(ps,ps2=ps_a,pname='ps') ; figs.append(fig) ; fignames.append('ps')
+            else:
+                fig = plot_ps(ps,pname='ps') ; figs.append(fig) ; fignames.append('ps')
+        if 'tcp' in pltvar:
+            if plot_anl:
+                fig = plot_ps(tcp,ps2=tcp_a,pname='tcp'); figs.append(fig) ; fignames.append('tcp')
+            else:
+                fig = plot_ps(tcp,pname='tcp') ; figs.append(fig) ; fignames.append('tcp')
       
         fig = plot_profile(uv,t,q,gps,amv,scrm,stat='bias',pltvar=pltvar,ylog=ylog,nlegend=nlegend) 
         figs.append(fig) ; fignames.append('bias')
