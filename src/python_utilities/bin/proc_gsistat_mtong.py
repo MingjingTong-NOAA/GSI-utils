@@ -122,7 +122,8 @@ def get_data2(gsistat,varname,select=None,level=None):
     df = pd.concat(df)
     return df
 
-def get_inst_data(gsistat,instname,select=None,level=None,plotanl=False,usedonly=True):
+def get_inst_data(gsistat,instname,select=None,level=None,plotanl=False,usedonly=True,
+                  subtypsum=False):
     df = []
     for n, i in enumerate(gsistat):
         tmp = i.extract_instrument('rad',instname,plotanl=plotanl,usedonly=usedonly)
@@ -139,8 +140,24 @@ def get_inst_data(gsistat,instname,select=None,level=None,plotanl=False,usedonly
             df = pd.concat(df)
     else:
         lendf=0
-    
-    return df, lendf
+
+    if not subtypsum:
+        count = df['nassim']
+        omf2 = df['OmFbc_rms']*df['OmFbc_rms']*df['nassim']
+        omfsum = df['OmF_bc']*df['nassim']
+        omfsum_wobc = df['OmF_wobc']*df['nassim']
+        std = df['OmFbc_std']
+        tmpa = pd.concat([count,omfsum_wobc,omfsum,omf2,std],keys=['nassim','OmF_wobc','OmF_bc','OmFbc_rms','OmFbc_std'],axis=1)
+
+        dfout = tmpa.groupby(level=['date','channel']).sum()
+        dfout['OmFbc_rms'] = np.sqrt(dfout['OmFbc_rms']/dfout['nassim'])
+        dfout['OmF_wobc']=dfout['OmF_wobc']/dfout['nassim']
+        dfout['OmF_bc'] = dfout['OmF_bc']/dfout['nassim']
+        dfout['OmFbc_std'] = np.sqrt(dfout['OmFbc_rms']*dfout['OmFbc_rms']-dfout['OmF_bc']*dfout['OmF_bc'])
+    else:
+        dfout = df
+
+    return dfout, lendf
 
 def plot_ps(ps,ps2=None,pname='ps'):
 
@@ -1175,8 +1192,8 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
         ax = axes[0]
         assim = []
         for e,expid in enumerate(labels):
-            print ('expid ', expid)
-            print (dfin[expid])
+            #print ('expid ', expid)
+            #print (dfin[expid])
             tmp = dfin[expid].groupby(level=statslvl).mean()
             tmp[['nassim']] = tmp[['nassim']].astype(int)
             tmp2 = tmp['nassim']
@@ -1241,8 +1258,8 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
         cntldfa=dfina[labels[0]][['OmFbc_std']].astype(float)
     #omfstdwci=cntldf.groupby(level=['satellite','channel']).mean()
     omfstdwci=cntldf.groupby(level=['channel']).mean()
-    print ('omfstdwci')
-    print (omfstdwci)
+    #print ('omfstdwci')
+    #print (omfstdwci)
     for e,expid in enumerate(labels):
         if normalize and e > 0:
             expdf = dfin[expid][['OmFbc_std']].astype(float)
@@ -1250,15 +1267,15 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
             if dfina is not None:
                 expdfa = dfina[expid][['OmFbc_std']].astype(float)
             normdf=expdf.div(cntldf,axis=1)
-            print ('normdf')
-            print (normdf)
+            #print ('normdf')
+            #print (normdf)
             #normdf=normdf.dropna()
             normdf['OmFbc_std']=normdf['OmFbc_std']*100.0
             #profile=normdf.groupby(expdf.index).apply(mean_confidence_interval)
             #profile=normdf.groupby(level=['satellite','channel']).apply(mean_confidence_interval)
             profile=normdf.groupby(level=['channel']).apply(mean_confidence_interval)
-            print ('profile')
-            print (profile)
+            #print ('profile')
+            #print (profile)
             stdmean=np.array([x[0] for x in profile])
             column_values = stdmean
             column_name = '%s_omfstd'%(labels[e])
@@ -1270,7 +1287,7 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
             omfstdwci[column_name]=column_values
             #print (omfstdwci)
         else:
-            tmp = dfin[expid].groupby(level=['satellite','channel']).mean()
+            tmp = dfin[expid].groupby(level=statslvl).mean()
             tmp[['OmFbc_std']] = tmp[['OmFbc_std']].astype(float)
             tmp2 = tmp['OmFbc_std']
             tmp2.name = labels[e]
@@ -1292,7 +1309,7 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
         yindex0=tomfstdwci.index.values.tolist()
         mchan=len(yindex0)
         for e,expid in enumerate(labels):
-            print ('exp ', expid)
+            #print ('exp ', expid)
             if e == 0:
                 ax.vlines(100.0,a[0],a[-1],colors='k',linestyles='-',linewidth=0.5,label=None)
             else:
@@ -1352,14 +1369,18 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
 
     return fig
 
-def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel'],wndic=None):
+def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel'],wobc=False,wndic=None):
 
     # Collect all experiments into a single DataFrame
     omfbc = []
     for e,expid in enumerate(labels):
         tmp = dfin[expid].groupby(level=statslvl).mean()
-        tmp[['OmF_bc']] = tmp[['OmF_bc']].astype(float)
-        tmp2 = tmp['OmF_bc']
+        if wobc:
+            tmp[['OmF_wobc']] = tmp[['OmF_wobc']].astype(float)
+            tmp2 = tmp['OmF_wobc']
+        else:
+            tmp[['OmF_bc']] = tmp[['OmF_bc']].astype(float)
+            tmp2 = tmp['OmF_bc']
         tmp2.name = labels[e]
         omfbc.append(tmp2)
 
@@ -1371,7 +1392,10 @@ def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel'],wndic=None)
     fig,ax = plt.subplots(figsize=(10,8))
     #omfbc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
     omfbc.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
-    titlestr = 'OmF bias w BC of %s observations\n%s' % (inst.upper(),title_substr)
+    if wobc:
+        titlestr = 'OmF bias w/o BC of %s observations\n%s' % (inst.upper(),title_substr)
+    else:
+        titlestr = 'OmF bias w BC of %s observations\n%s' % (inst.upper(),title_substr)
     ax.set_title(titlestr,fontsize='x-large')
 
     yindex=omfbc.index.values.tolist()
@@ -1402,68 +1426,19 @@ def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel'],wndic=None)
     else:
         yticklabels_new = get_yticklabels_new(ax)
         ax.set_yticklabels(yticklabels_new,fontsize=8)
-    plt.xlabel('O-F Mean Bias (K)')
+    if wobc:
+        plt.xlabel('O-F Mean Bias w/o BC (K)')
+    else:
+        plt.xlabel('O-F Mean Bias (K)')
 
     return fig
 
-def plot_channel_omfwobc(dfin,inst='',statslvl=['satellite','channel'],wndic=None):
-
-    # Collect all experiments into a single DataFrame
-    omfwobc = []
-    for e,expid in enumerate(labels):
-        tmp = dfin[expid].groupby(level=statslvl).mean()
-        tmp[['OmF_wobc']] = tmp[['OmF_wobc']].astype(float)
-        tmp2 = tmp['OmF_wobc']
-        tmp2.name = labels[e]
-        omfwobc.append(tmp2)
-
-    omfwobc = pd.concat(omfwobc,axis=1)
-
-    lc = mc[0] if len(labels) == 1 else mc[:len(labels)]
-
-    fig,ax = plt.subplots(figsize=(10,8))
-    omfwobc.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
-    yindex=omfwobc.index.values.tolist()
-    a = np.arange(len(yindex))
-    if wndic is not None:
-        y2index=[]
-        for ch in yindex:
-            y2index.append(f'{ch}, {int(wndic[ch])}')
-        yindex = y2index
-        ax.set_ylabel('Channel, Wavenumber $(cm^{-1})$',fontsize=10)
-    else:
-        ax.set_ylabel('Channel',fontsize=10)
-
-    if inst == 'airs' or inst == 'iasi' or 'cris' in inst:
-        ax.yaxis.set_ticks(a[::5])
-        ax.yaxis.set_ticklabels(yindex[::5])
-    else:
-        ax.yaxis.set_ticks(a)
-        ax.yaxis.set_ticklabels(yindex)
-    ax.yaxis.set_tick_params(labelsize=8)
-
-    titlestr = 'OmF bias w/o BC of %s observations\n%s' % (inst.upper(),title_substr)
-    ax.set_title(titlestr,fontsize='x-large')
-    if len(statslvl) == 1:
-        #yindex=omfwobc.index.get_level_values('channel')
-        #plt.vlines(0.0,yindex[0],yindex[-1],colors='k',linestyles='--',linewidth=2.0,label=None)
-        plt.legend(loc=0,numpoints=1,frameon=False)
-        #plt.ylim(0,yindex[-1]+1)
-        #plt.yticks(yindex)
-        #plt.ylabel('Channel',fontsize=12)
-    else:
-        yticklabels_new = get_yticklabels_new(ax)
-        ax.set_yticklabels(yticklabels_new,fontsize=8)
-    plt.xlabel('O-F Mean Bias w/o BC (K)')
-
-    return fig
-
-def plot_channel_omfbias(dfin,inst='',wndic=None):
+def plot_channel_omfbias(dfin,inst='',statslvl=['satellite','channel'],wndic=None):
 
     # Collect all experiments into a single DataFrame
     figs = []; fignames = []
     for e,expid in enumerate(labels):
-        tmp = dfin[expid].groupby(level=['satellite','channel']).mean()
+        tmp = dfin[expid].groupby(level=statslvl).mean()
         tmp[['OmF_wobc','OmF_bc']] = tmp[['OmF_wobc','OmF_bc']].astype(float)
         omfbc = tmp[['OmF_wobc','OmF_bc']]
         omfbc.columns = ['bfbc','aftbc']
@@ -1479,9 +1454,15 @@ def plot_channel_omfbias(dfin,inst='',wndic=None):
                 y2index.append((ch[0], f'{ch[1]}/{int(wndic[ch[1]])}'))
                 #y2index.append((ch[0], (ch[1],int(wndic[ch[1]]))))
             yindex = y2index
-            ax.set_ylabel('Instrument, Channel/Wavenumber $(cm^{-1})$',fontsize=10)
+            if len(statslvl) > 1:
+                ax.set_ylabel('Instrument, Channel/Wavenumber $(cm^{-1})$',fontsize=10)
+            else:
+                ax.set_ylabel('Channel/Wavenumber $(cm^{-1})$',fontsize=10)
         else:
-            ax.set_ylabel('Instrument, Channel',fontsize=10)
+            if len(statslvl) > 1:
+                ax.set_ylabel('Instrument, Channel',fontsize=10)
+            else:
+                ax.set_ylabel('Channel',fontsize=10)
 
         if len(yindex) > 50:
             a = np.arange(len(yindex))
@@ -1494,8 +1475,9 @@ def plot_channel_omfbias(dfin,inst='',wndic=None):
 
         titlestr = '%s OmF bias of %s observations\n%s' % (labels[e],inst.upper(),title_substr)
         ax.set_title(titlestr,fontsize='x-large')
-        yticklabels_new = get_yticklabels_new(ax)
-        ax.set_yticklabels(yticklabels_new,fontsize=8)
+        if len(statslvl) > 1:
+            yticklabels_new = get_yticklabels_new(ax)
+            ax.set_yticklabels(yticklabels_new,fontsize=8)
         figs.append(fig)
         fignames.append(inst+'omfbias'+labels[e])
 
@@ -1940,16 +1922,19 @@ if __name__ == '__main__':
             tmp, tmp2, tmp3 = {}, {}, {}
             for expid in labels:
                 expid_gsistat = gsistat[expid]
-                expid_inst, lendf = get_inst_data(expid_gsistat,inst,select=1,level='it',plotanl=plot_anl,usedonly=plot_used)
+                expid_inst, lendf = get_inst_data(expid_gsistat,inst,select=1,level='it',plotanl=plot_anl,
+                                                  usedonly=plot_used,subtypsum=subtypsum)
                 if lendf > 0:
                     tmp[expid] = expid_inst
                     insts[inst] = tmp
                 if plot_anl:
-                   expid_inst, lendf2 = get_inst_data(expid_gsistat,inst,select=2,level='it',plotanl=True,usedonly=plot_used)
+                   expid_inst, lendf2 = get_inst_data(expid_gsistat,inst,select=2,level='it',plotanl=True,
+                                                      usedonly=plot_used,subtypsum=subtypsum)
                    if lendf > 0 and lendf2 > 0:
                        tmp2[expid] = expid_inst
                        insts2[inst] = tmp2
-                   expid_inst, lendf3 = get_inst_data(expid_gsistat,inst,select=3,level='it',plotanl=True,usedonly=plot_used)
+                   expid_inst, lendf3 = get_inst_data(expid_gsistat,inst,select=3,level='it',plotanl=True,
+                                                      usedonly=plot_used,subtypsum=subtypsum)
                    if lendf > 0 and lendf3 > 0:
                        tmp3[expid] = expid_inst
                        insts3[inst] = tmp3
@@ -2094,10 +2079,13 @@ if __name__ == '__main__':
                     
                 fig = plot_channel_omfbc(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic)
                 figs.append(fig) ; fignames.append(inst+'omf')
-                fig = plot_channel_omfwobc(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic) 
+                fig = plot_channel_omfbc(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic,wobc=True) 
                 figs.append(fig) ; fignames.append(inst+'omfwobc')
-
-                bfigs,bfignames = plot_channel_omfbias(insts[inst],inst=inst,wndic=wndic)
+             
+                if not subtypsum:
+                    bfigs,bfignames = plot_channel_omfbias(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic)
+                else:
+                    bfigs,bfignames = plot_channel_omfbias(insts[inst],inst=inst,wndic=wndic)
                 if save_figure:
                     for fig,figname in zip(bfigs,bfignames):
                         figname = './gsistat_%s' % figname
