@@ -361,7 +361,7 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
     
         if len(pltvar) >=5:
             if ( v in [0,3] ): plt.ylabel('Pressure (hPa)',fontsize=fontsize)
-            if ( v in [5] ): plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
+            if ( v in [3] ): plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
         else:
             if len(pltvar) == 1:
                 plt.ylabel('Pressure (hPa)',fontsize=fontsize)
