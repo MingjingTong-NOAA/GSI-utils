@@ -95,10 +95,13 @@ def get_data1(gsistat,varname,it=1,use='asm',typ='all',subtypsum=False):
                     rms = tmp.xs('rms', axis=0, level='stat')
                     bias = tmp.xs('bias', axis=0, level='stat')
                     count = tmp.xs('count', axis=0, level='stat')
-                    rms = np.sqrt(rms/count).assign(stat='rms').set_index('stat', append=True)
-                    bias = (bias/count).assign(stat='bias').set_index('stat', append=True)
-                    count=count.assign(stat='count').set_index('stat', append=True)
-                    tmp = pd.concat([count,bias,rms],axis=0)
+                    rms = np.sqrt(rms/count)
+                    bias = bias/count
+                    std = np.sqrt(rms*rms-bias*bias).assign(stat='std').set_index('stat', append=True)
+                    rms = rms.assign(stat='rms').set_index('stat', append=True)
+                    bias = bias.assign(stat='bias').set_index('stat', append=True)
+                    count = count.assign(stat='count').set_index('stat', append=True)
+                    tmp = pd.concat([count,bias,rms,std],axis=0)
             else:
                 msg = 'get_data1: varname %s is not a valid variable\n' % varname
                 msg += 'try: ps, uv, t, q'
@@ -306,7 +309,7 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
 
             elevs = np.array(levs) + e
             if ylog:
-                if stat == 'rms' and ncount >= 12:
+                if (stat == 'rms' or stat == 'std') and ncount >= 12:
                     yindex = elevs
                 else:
                     yindex = levs
@@ -320,7 +323,7 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                     else:
                         plt.vlines(100.,lmin,lmax,colors='k',linestyles='--',linewidth=lw,label=None)
                 else:
-                    if stat == 'rms':
+                    if stat == 'rms' or stat == 'std':
                         if ncount >= 12:
                             tyidx=yindex+(e-1)*0.05
                             ax.errorbar(profilen, tyidx, xerr=CI_95n, label=labels[e], color=mc[e], 
@@ -332,7 +335,7 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                         ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
                                 linewidth=lw, alpha=alpha)
             else:
-                if stat == 'rms':
+                if stat == 'rms' or stat == 'std':
                     if ncount >= 12:
                         ax.errorbar(profile0, yindex, xerr=CI_95, label=labels[e], color=mc[e])
                     else:
@@ -351,7 +354,7 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                 tmp1=profilen[~np.isnan(profilen)]
                 if ncount >= 12:
                     tmp2=CI_95n[~np.isnan(CI_95n)]
-                if stat == 'rms' and ncount >= 12:
+                if (stat == 'rms' or stat == 'std') and ncount >= 12:
                     xmin_,xmax_ = np.min(tmp1-tmp2),np.max(tmp1+tmp2) 
                 else:
                     xmin_,xmax_ = np.min(tmp1),np.max(tmp1)
@@ -397,17 +400,19 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
             else:
                 if stat == 'rms':
                     plt.xlabel('normalized rms O-F (%)',fontsize=fontsize)
+                elif stat == 'std':
+                    plt.xlabel('normalized O-F std. dev. (%)',fontsize=fontsize)
                 else:
                     plt.xlabel('normalized data count (%)',fontsize=fontsize)
         else:
-            if stat in ['rms','bias']:
+            if stat in ['rms','bias','std']:
                 plt.xlabel('(%s)' % var_unit,fontsize=fontsize)
             else:
                 plt.xlabel('count', fontsize=fontsize)
 
         if len(pltvar) > 1:
             if normalize or pairdiff:
-                    if stat == 'rms':
+                    if stat == 'rms' or stat == 'std':
                         if anl:
                             plt.suptitle('%s O-A\n%s' % (stat.upper(),title_substr),fontsize='x-large',fontweight='bold')
                         else:
@@ -415,7 +420,7 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                     elif stat == 'count':
                         plt.suptitle('Normalized Observation Counts\n%s'%title_substr,fontsize='x-large',fontweight='bold')                
             else:
-                if stat in ['rms','bias']:
+                if stat in ['rms','bias','std']:
                     if anl:
                         plt.suptitle('%s O-A\n%s' % (stat.upper(),title_substr),fontsize='x-large',fontweight='bold')
                     else:
@@ -1179,8 +1184,8 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff
 
     return fig
 
-def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=False,
-                        statslvl=['satellite','channel'],wndic=None):
+def plot_channel_radfit(dfin,dflen,dfina=None,inst='',stat='std',normalize=False,
+                        obsnum=False,statslvl=['satellite','channel'],wndic=None):
 
     if obsnum:
         fig, axes = plt.subplots(1,2,figsize=(8, 6))
@@ -1249,28 +1254,32 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
             yticklabels_new = get_yticklabels_new(ax)
             ax.set_yticklabels(yticklabels_new,fontsize=8)
  
+    if stat == 'std':
+        statvar = 'OmFbc_std'
+    else:
+        statvar = 'OmFbc_rms'
 
     omfstd = []; CI_95 = []
-    cntldf=dfin[labels[0]][['OmFbc_std']].astype(float)
+    cntldf=dfin[labels[0]][[statvar]].astype(float)
     #print (cntldf)
     #cntldf=cntldf.dropna()
     if dfina is not None:
-        cntldfa=dfina[labels[0]][['OmFbc_std']].astype(float)
+        cntldfa=dfina[labels[0]][[statvar]].astype(float)
     #omfstdwci=cntldf.groupby(level=['satellite','channel']).mean()
     omfstdwci=cntldf.groupby(level=['channel']).mean()
     #print ('omfstdwci')
     #print (omfstdwci)
     for e,expid in enumerate(labels):
         if normalize and e > 0:
-            expdf = dfin[expid][['OmFbc_std']].astype(float)
+            expdf = dfin[expid][[statvar]].astype(float)
             #expdf = expdf.dropna()
             if dfina is not None:
-                expdfa = dfina[expid][['OmFbc_std']].astype(float)
+                expdfa = dfina[expid][[statvar]].astype(float)
             normdf=expdf.div(cntldf,axis=1)
             #print ('normdf')
             #print (normdf)
             #normdf=normdf.dropna()
-            normdf['OmFbc_std']=normdf['OmFbc_std']*100.0
+            normdf[statvar]=normdf[statvar]*100.0
             #profile=normdf.groupby(expdf.index).apply(mean_confidence_interval)
             #profile=normdf.groupby(level=['satellite','channel']).apply(mean_confidence_interval)
             profile=normdf.groupby(level=['channel']).apply(mean_confidence_interval)
@@ -1288,8 +1297,8 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
             #print (omfstdwci)
         else:
             tmp = dfin[expid].groupby(level=statslvl).mean()
-            tmp[['OmFbc_std']] = tmp[['OmFbc_std']].astype(float)
-            tmp2 = tmp['OmFbc_std']
+            tmp[[statvar]] = tmp[[statvar]].astype(float)
+            tmp2 = tmp[statvar]
             tmp2.name = labels[e]
             omfstd.append(tmp2)
             #print ('omfstd')
@@ -1340,7 +1349,10 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
             ax.yaxis.set_ticklabels(yindex)
 
         ax.yaxis.set_tick_params(labelsize=8)
-        ax.set_xlabel('FG std. dev. (%, normalized)',fontsize=10)
+        if stat == 'std':
+            ax.set_xlabel('OmF std. dev. (%, normalized)',fontsize=10)
+        else:
+            ax.set_xlabel('rms of OmF. (%, normalized)',fontsize=10)
         amin = tomfstdwci[[column_std]].values.min()
         amin = amin - (100.0- amin) * 0.1
         amax = tomfstdwci[[column_std]].values.max()
@@ -1361,10 +1373,16 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',normalize=False,obsnum=Fal
         ax.set_yticklabels(yticklabels_new,fontsize=8)
 
     if not obsnum:
-        titlestr = 'Normalized OmF std. dev of %s observations\n%s' % (inst.upper(),title_substr)
+        if stat == 'std':
+            titlestr = 'Normalized OmF std. dev of %s observations\n%s' % (inst.upper(),title_substr)
+        else:
+            titlestr = 'Normalized rms of OmF of %s observations\n%s' % (inst.upper(),title_substr)
         ax.set_title(titlestr,fontsize='x-large')
     else:
-        titlestr = 'Normalized Obs count & OmF std. dev of %s observations\n%s' % (inst.upper(),title_substr)
+        if stat == 'std':
+            titlestr = 'Normalized Obs count & OmF std. dev of %s observations\n%s' % (inst.upper(),title_substr)
+        else:
+            titlestr = 'Normalized Obs count & rms of OmF of %s observations\n%s' % (inst.upper(),title_substr)
         fig.suptitle(titlestr, fontsize=12)
 
     return fig
@@ -1807,7 +1825,8 @@ if __name__ == '__main__':
     else:
         uvtyp = [220,221,223,229,230,231,232,233,234,235,236,280,282,289,290]
         ttyp = [120,132,180,182]
-        qtyp = [120,132,180,182]
+        #qtyp = [120,132,180,182]
+        qtyp = [120,132,133,136,180,182]
         """ rawwinsonde """
         #uvtyp = [220]
         #ttyp = [120]
@@ -1983,10 +2002,18 @@ if __name__ == '__main__':
                     fig = plot_profile(uv,t,q,gps,amv,scrm,stat='rms',normalize=True,pltvar=[var],ylog=ylog,
                                        nlegend=nlegend)
                     figs.append(fig) ; fignames.append(f'rmsn_{var}')
+                    if not subtypsum:
+                        fig = plot_profile(uv,t,q,gps,amv,scrm,stat='std',normalize=True,pltvar=[var],ylog=ylog,
+                                           nlegend=nlegend)
+                        figs.append(fig) ; fignames.append(f'stdn_{var}')
             else:
                 fig = plot_profile(uv,t,q,gps,amv,scrm,stat='rms',normalize=True,pltvar=pltvar,ylog=ylog,
                                    nlegend=nlegend)
                 figs.append(fig) ; fignames.append('rmsn')
+                if not subtypsum:
+                    fig = plot_profile(uv,t,q,gps,amv,scrm,stat='std',normalize=True,pltvar=pltvar,ylog=ylog,
+                                       nlegend=nlegend)
+                    figs.append(fig) ; fignames.append('stdn')
             if plot_anl:
                 fig = plot_profile(uv_a,t_a,q_a,gps_a,amv_a,scrm_a,stat='rms',anl=True,normalize=True,
                                    pltvar=pltvar,ylog=ylog,nlegend=nlegend)
@@ -1994,11 +2021,13 @@ if __name__ == '__main__':
         else:
             fig = plot_profile(uv,t,q,gps,amv,scrm,stat='rms',pltvar=pltvar,ylog=ylog)
             figs.append(fig) ; fignames.append('rms')
+            if not subtypsum:
+                fig = plot_profile(uv,t,q,gps,amv,scrm,stat='std',pltvar=pltvar,ylog=ylog)
+                figs.append(fig) ; fignames.append('std')
             if plot_anl:
                 fig = plot_profile(uv_a,t_a,q_a,gps_a,amv_a,scrm_a,stat='rms',anl=True,pltvar=pltvar,
                                    ylog=ylog,nlegend=nlegend) 
                 figs.append(fig) ; fignames.append('rms_anl')
-
 
     # plot cost function and gradient together
     if plot_costg or plot_costgJo: 
@@ -2062,11 +2091,17 @@ if __name__ == '__main__':
                     #figs.append(fig); fignames.append(inst+'fitbar')
                     fig = plot_channel_radfit(insts[inst],lendf,inst=inst,normalize=True,obsnum=True,
                                               statslvl=['channel'],wndic=wndic)
-                    figs.append(fig); fignames.append(inst+'fit')
+                    figs.append(fig); fignames.append(inst+'fitstd')
+                    fig = plot_channel_radfit(insts[inst],lendf,inst=inst,stat='rms',normalize=True,obsnum=True,
+                                              statslvl=['channel'],wndic=wndic)
+                    figs.append(fig); fignames.append(inst+'rmsfit')
                     if plot_anl:
                         fig = plot_channel_radfit(insts3[inst],lendf,inst=inst,normalize=True,obsnum=True,
                                                   statslvl=['channel'],wndic=wndic)
-                        figs.append(fig); fignames.append(inst+'fit_anl')
+                        figs.append(fig); fignames.append(inst+'fitstd_anl')
+                        fig = plot_channel_radfit(insts3[inst],lendf,inst=inst,stat='rms',normalize=True,obsnum=True,
+                                                  statslvl=['channel'],wndic=wndic)
+                        figs.append(fig); fignames.append(inst+'rmsfit_anl')
                         fig = plot_channel_omf_FGvsANL(insts[inst],insts2[inst],insts3[inst],
                                                        stats='std',inst=inst,wndic=wndic)
                         figs.append(fig); fignames.append(inst+'std_fganl')
