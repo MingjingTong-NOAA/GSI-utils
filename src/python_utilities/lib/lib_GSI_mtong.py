@@ -310,8 +310,6 @@ class GSIstat(object):
         # get usage 
         df_usage = self._get_instrument_usage(instrument) 
 
-        #print ('usage', df_usage)
-
         instruments = sorted(otype.index.get_level_values('instrument').unique())
         satellites  = sorted(otype.index.get_level_values('satellite' ).unique())
 
@@ -349,9 +347,9 @@ class GSIstat(object):
     
         columns = ['it', 'channel', 'instrument', 'satellite', 'nassim', 'nrej', 'oberr', 'OmF_wobc', 'OmF_bc', 'pen', 'OmFbc_rms', 'OmFbc_std']
         df = _pd.DataFrame(data=tmp,columns=columns)
-        df.drop(['pen', 'OmFbc_rms'],inplace=True,axis=1) # future columns, drop!
+        df.drop(['pen'],inplace=True,axis=1) # future columns, drop!
         df[['channel', 'nassim', 'nrej']] = df[['channel', 'nassim', 'nrej']].astype(int)
-        df[['oberr', 'OmF_wobc', 'OmF_bc', 'OmFbc_std']] = df[['oberr', 'OmF_wobc', 'OmF_bc', 'OmFbc_std']].astype(float)
+        df[['oberr', 'OmF_wobc', 'OmF_bc', 'OmFbc_rms', 'OmFbc_std']] = df[['oberr', 'OmF_wobc', 'OmF_bc', 'OmFbc_rms', 'OmFbc_std']].astype(float)
 
 
         # Since iteration number is not readily available, make one
@@ -379,14 +377,17 @@ class GSIstat(object):
                     it[its:ite] = i+1
                 df['it'] = it
         
-                df = df[['it', 'instrument', 'satellite', 'channel', 'nassim', 'nrej', 'oberr', 'OmF_wobc', 'OmF_bc', 'OmFbc_std']]
+                df = df[['it', 'instrument', 'satellite', 'channel', 'nassim', 'nrej', 'oberr', 'OmF_wobc', 'OmF_bc', 'OmFbc_rms', 'OmFbc_std']]
                 df.set_index(['it', 'instrument', 'satellite', 'channel'],inplace=True)
     
             #_pd.set_option('display.max_rows', None)
             if usedonly:
                 tmp = df.join(df_usage, how='inner')
                 df = tmp.loc[tmp['use'] == 1].drop(['use'],axis=1)
-    
+
+            # Add datetime index
+            df = self._add_datetime_index(df)
+
         return df
 
     # Surface pressure Fit
