@@ -12,6 +12,7 @@ exp=v16rt2
 diagdir=/scratch1/NCEPDEV/da/${USER}/archive/${exp}
 #working directory
 wrkdir=/scratch1/NCEPDEV/stmp4/${USER}/corr_obs_${instr}
+newrun="YES"
 #location the covariance matrix is saved to
 savdir=$diagdir
 #FOV type- 0 for all, 1 for sea, 2 for land, 3 for snow, 
@@ -28,11 +29,16 @@ wave_out=.false.
 err_out=.false.
 #option to output the correlation matrix
 corr_out=.false.
+#option to output the observation pairs
+npair_out=.false.
 #condition number to recondition Rcov.  Set <0 to not recondition
-kreq=-200
+kreq=200
+#condition number to recondition Rcov (< 1.0)
+kreq2=0.0
 #inflation factors, for regular channels, surface channels and water vapor channels
 #infl is applied to all channels if using binary files or a MW instrument
 #set factors equal to 1 to not inflate, or if this channel group is not assimilated
+infdiag=.false.
 infl=1.0
 inflsurf=1.0
 inflwv=1.0
@@ -46,12 +52,27 @@ time_sep=1.0
 bsize=1
 #bin center, in km, needed for Hollingsworth-Lonnberg
 bcen=80
+if [ $cov_method -eq 1 ]; then
+  wrkdir=/scratch2/NCEPDEV/stmp3/${USER}/corr_obs_${instr}_hl
+  if [ $infdiag = ".true." ]; then
+    savdir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/noscrub/Rcov/${exp}/cloud${cloud}_hl_bcen${bcen}_kreq${kreq}_inf${infl}
+  else
+    savdir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/noscrub/Rcov/${exp}/cloud${cloud}_hl_bcen${bcen}_kreq${kreq}_infR${infl}k${kreq2}
+  fi
+else
+  wrkdir=/scratch2/NCEPDEV/stmp3/${USER}/corr_obs_${instr}
+  if [ $infdiag = ".true." ]; then
+    savdir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/noscrub/Rcov/${exp}/cloud${cloud}_kreq${kreq}_inf${infl}
+  else
+    savdir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/noscrub/Rcov/${exp}/cloud${cloud}_kreq${kreq}_infR${infl}k${kreq2}
+  fi
+fi
 #channel set choice:  0 to only use active channels, 1 to use all channels
 chan_set=0
 #number of processors to use to unpack radstat files-most efficient if # of radstats/$num_proc has a small remainder
-num_proc=11
+num_proc=40
 #number of processors to run cov_calc on
-NP=16
+NP=10
 #wall time to unpack radstat files format hh:mm:ss for hera, hh:mm for wcoss
 unpack_walltime=02:30:00
 #wall time to run cov_calc hh:mm:ss for hera, hh:mm for wcoss
@@ -62,20 +83,41 @@ Umem=50
 #requested memory in MB for cov_calc, on WCOSS/Cray
 Mem=50
 #job account name (needed on hera only)
-account=da-cpu
+account=gfdl-hires
 #job project code (needed on wcoss only)
 project_code=GFS-T2O
 #machine-hera or wcoss, all lower case
 machine=hera
 #netcdf or binary diag files-0 for binary, 1 for netcdf
 netcdf=1
-ndate=/scratch1/NCEPDEV/da/Kristen.Bathmann/Analysis_util/ndate
-#ndate=/gpfs/dell2/emc/modeling/noscrub/Kristen.Bathmann/ndate
+ndate=/home/Mingjing.Tong/bin/ndate
 
 ####################################################################
 
+stype=sea
+if [ $type -eq 0 ] ; then
+   stype=glb
+elif [ $type -eq 2 ] ; then
+   stype=land
+elif [ $type -eq 3 ] ; then
+   stype=snow
+elif [ $type -eq 4 ] ; then
+   stype=mixed
+elif [ $type -eq 5 ] ; then
+   stype=ice
+elif [ $type -eq 6 ] ; then
+   stype=snow_ice
+fi
+wrkdir=${wrkdir}/${stype}
 cdate=$bdate
-[ ! -d ${wrkdir} ] && mkdir ${wrkdir}
+if [[ -d ${wrkdir} && $newrun == "YES" ]]; then
+  rm -rf ${wrkdir}
+fi
+if [ ! -d ${wrkdir} ]; then
+  mkdir -p ${wrkdir}
+fi
+
+
 nt=0
 one=1
 while [[ $cdate -le $edate ]] ; do
@@ -92,9 +134,10 @@ dattot=$nt
 cp unpack_rads.sh $wrkdir
 cp par_run.sh $wrkdir
 cp sort_diags.sh $wrkdir
-cp ../../exec/cov_calc $wrkdir
+cp ../../install/bin/cov_calc.x $wrkdir/cov_calc
 
 cd $wrkdir
+if [ $newrun = "YES" ]; then
 num_jobs=$num_proc
 if [ $num_proc -ge $nt ] ; then
    num_jobs=$nt
@@ -234,9 +277,11 @@ bsub -w "done(unpack)" < sort_diags.sh
 else
    exit 1
 fi
+fi
+
 #run cov_calc
 if [ $machine = hera ] ; then
-cat << EOF > params.sh
+cat > params.sh << EOF
 #!/bin/sh
 #SBATCH -A $account
 #SBATCH -o comp_out
@@ -246,7 +291,15 @@ cat << EOF > params.sh
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=$NP
 #SBATCH -J cov_calc
+EOF
+if [ $newrun = "YES" ]; then
+  cat >> params.sh << EOF
 #SBATCH --dependency=after:${jobid##* }
+EOF
+else
+  rm -f comp_err comp_out
+fi
+cat >> params.sh << EOF
 bdate=$bdate
 edate=$edate
 instr=$instr
@@ -259,7 +312,10 @@ angle=$angle
 wave_out=$wave_out
 err_out=$err_out
 corr_out=$corr_out
+npair_out=$npair_out
 kreq=$kreq
+kreq2=$kreq2
+infdiag=$infdiag
 infl=$infl
 inflsurf=$inflsurf
 inflwv=$inflwv
@@ -302,7 +358,10 @@ angle=$angle
 wave_out=$wave_out
 err_out=$err_out
 corr_out=$corr_out
+npair_out=$npair_out
 kreq=$kreq
+kreq2=$kreq2
+infdiag=$infdiag
 infl=$infl
 inflsurf=$inflsurf
 inflwv=$inflwv

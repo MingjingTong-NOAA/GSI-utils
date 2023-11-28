@@ -5,7 +5,6 @@ install*/
 *.mod
 .DS_Store
 exec/
-lib/
 lib64/
 
 nohup.out

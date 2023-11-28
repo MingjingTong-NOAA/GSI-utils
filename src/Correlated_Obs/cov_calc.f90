@@ -33,13 +33,18 @@ character(256):: chnum_file                              !name of outputted file
 character(256):: err_file                                !name of outputted file containing assumed obs errors
 character(256):: satinfo_file                            !name of outputted file containing satinfo obs errors
 character(256):: corr_file                               !name of outputted correlation file
+character(256):: npair_file                              !name of outputted number of observation pairs
+character(256):: eigs_file                               !name of outputted eigenvalue 
 character(256):: instr
 integer(i_kind), parameter:: dsize=4500                  !cap size on the number of omg's that can be stored at each time step
 integer(i_kind):: lencov, lencorr, lenwave, lenerr, lensat, lenchnum
+integer(i_kind):: lennpair, leneigs
 integer(i_kind):: reclen, leninstr
 logical:: out_wave                                       !option to output channel wavenumbers
 logical:: out_err                                        !option to output obs errors
 logical:: out_corr                                       !option to output correlation matrix
+logical:: out_npair                                      !option to output observation pairs
+logical:: infdiag                                        !inflate diagonal value of R
 
 !Diag data
 type(RadData):: Radges,Radanl                            !actual data from the radstats
@@ -66,26 +71,26 @@ real(r_kind), dimension(:,:), allocatable:: Rcorr        !the correlation matrix
 real(r_kind), dimension(:,:), allocatable:: anl_ave      !average value of oma
 real(r_kind), dimension(:,:), allocatable:: ges_ave      !average value of omb
 integer(i_kind), dimension(:,:), allocatable:: divider   !divider(r,c) gives the total number of ges omgs used to compute Rcov(r,c)
+integer(i_kind), dimension(:,:,:), allocatable:: divbig
 real(r_kind):: cov_sum, ges_sum1,ges_sum2
 real(r_kind):: ges_sum,anl_sum
 real(r_kind):: val, divreal
 integer(i_kind):: div
 real(r_kind), dimension(:,:,:), allocatable:: Rcovbig
 real(r_kind), dimension(:,:,:), allocatable:: ges_avebig1,ges_avebig2
-real(r_kind), dimension(:,:,:), allocatable:: divbig
 
 !Matrix conditioning
 real(r_kind),dimension(:), allocatable:: eigs            !Eigenvalue array (if reconditioning)
 real(r_kind),dimension(:,:), allocatable:: eigv          !Eigenvectors (if reconditioning)
 real(r_kind), dimension(:,:), allocatable:: Rout
-real(r_kind):: kreq, mx, mn
+real(r_kind):: kreq, kreq2, mx, mn
 integer(i_kind):: rec_method
 real(r_kind), parameter:: errt=0.0001_r_kind
 real(r_kind)::infl,inflwv,inflsurf
 
 read(5,*) ntimes, Surface_Type, Cloud_Type, satang, instr, out_wave, out_err,  &
-   out_corr, kreq, infl,inflsurf,inflwv,rec_method, cov_method, chan_choice, timeth, bin_size, &
-   bin_center, netcdf_in
+   out_corr, out_npair, kreq, kreq2, infdiag, infl,inflsurf,inflwv,rec_method, cov_method, &
+   chan_choice, timeth, bin_size, bin_center, netcdf_in
 netcdf=.false.
 if (netcdf_in>0) netcdf=.true.
 if (cov_method==desroziers) then
@@ -105,6 +110,8 @@ cov_file=''
 corr_file=''
 wave_file=''
 chnum_file=''
+npair_file=''
+eigs_file=''
 err_file=''
 satinfo_file=''
 cov_file(1:lencov)='Rcov_'
@@ -118,6 +125,13 @@ wave_file(lenwave+1:lenwave+leninstr)=instr
 lenchnum=len_trim('chnum_')
 chnum_file(1:lenchnum)='chnum_'
 chnum_file(lenchnum+1:lenchnum+leninstr)=instr
+lennpair=len_trim('npair_')
+npair_file(1:lennpair)='npair_'
+npair_file(lennpair+1:lennpair+leninstr)=instr
+leneigs=len_trim('eigs_')
+eigs_file(1:leneigs)='eigs_'
+eigs_file(leneigs+1:leneigs+leninstr)=instr
+
 lenerr=len_trim('err_')
 err_file(1:lenerr)='err_'
 err_file(lenerr+1:leninstr+lenerr)=instr
@@ -160,8 +174,8 @@ if (out_corr) then
    allocate(Rcorr(nch_active,nch_active))
    Rcorr=zero
 end if
+allocate(eigs(nch_active),eigv(nch_active,nch_active))
 if (kreq>zero) then
-   allocate(eigs(nch_active),eigv(nch_active,nch_active))
    allocate(Rout(nch_active,nch_active))
 end if            
 Rcov=zero
@@ -291,10 +305,20 @@ end do
 
 end if
 Rcov=(Rcov+TRANSPOSE(Rcov))/two
+open(20,file=trim(eigs_file),access='stream', form='unformatted')
+write(20) real(kreq,r_kind)
+write(20) infl
+
+eigs=0
+eigv=0
+call eigdecomp(Rcov,nch_active,eigs,eigv)
+write(20) eigs
 if (kreq>zero) then
-   eigs=0
-   eigv=0
-   call eigdecomp(Rcov,nch_active,eigs,eigv)
+!   eigs=0
+!   eigv=0
+!   call eigdecomp(Rcov,nch_active,eigs,eigv)
+!   write(20) eigs
+   print *,'before recondition eigs, Rcov =', eigs(1), Rcov(1,1)
    mx=0
    mn=1000
    do r=1,nch_active
@@ -309,6 +333,8 @@ end if
 Rcov=(Rcov+TRANSPOSE(Rcov))/two
 if (kreq>zero) then
    call eigdecomp(Rcov,nch_active,eigs,eigv)
+   write(20) eigs
+   print *,'after recondition eigs, Rcov =', eigs(1), Rcov(1,1)
    mx=0
    mn=1000
    do r=1,nch_active
@@ -318,7 +344,7 @@ if (kreq>zero) then
    end do
    print *, 'New condition number before variance inflation: ', mx/mn
 end if
-if (apodize) then
+if (apodize .and. infdiag) then
   do r=1,napd
       val=Rcov(indapR(r),indapR(r))*Rcov(indapR(r)-1,indapR(r)-1)
       if ((Rcov(indapR(r),indapR(r)-1)/sqrt(val)>0.15)) then
@@ -336,6 +362,8 @@ if (apodize) then
      endif
    endif
 endif
+
+if (infdiag) then   
 if (inds1a==0) then !MW instrument or binary file
    do r=1,nch_active
      Rcov(r,r)=Rcov(r,r)*infl*infl
@@ -376,10 +404,30 @@ if (((indwvb>0).and.(indwvb<nch_active)).or.((inds2b>0).and.(inds2b<nch_active).
     Rcov(r,r)=Rcov(r,r)*infl*infl
   enddo
 endif
+
+else
+
+  do c=1,nch_active
+    do r=1,nch_active
+      if (r==c) then
+        Rcov(r,r)=infl*infl*(sqrt(Rcov(r,r))+kreq2)**2
+      else
+        Rcov(r,c)=infl*infl*Rcov(r,c)
+      endif
+    enddo
+  enddo     
+
+endif
+
 if (out_corr) then
    do c=1,nch_active
       do r=1,nch_active
-        if (divider(r,c)>zero) then
+        if (cov_method==hl_method) then
+           divreal=real(divbig(r,c,1),r_kind)
+        else
+           divreal=real(divider(r,c),r_kind)
+        end if
+        if (divreal>zero) then
             val=Rcov(r,r)*Rcov(c,c)
             val=sqrt(abs(val))
             if (val>errt) then
@@ -396,6 +444,8 @@ if (out_corr) then
 end if
 if (kreq>zero) then
    call eigdecomp(Rcov,nch_active,eigs,eigv)
+   write(20) eigs
+   print *,'after inflation eigs, Rcov =', eigs(1), Rcov(1,1)
    mx=0
    mn=1000
    do r=1,nch_active
@@ -405,6 +455,19 @@ if (kreq>zero) then
    end do
    print *, 'Final condition number: ', mx/mn
 end if
+close(20)
+
+if (out_npair) then
+   if (cov_method==hl_method) then
+      open(21,file=trim(npair_file),form='unformatted',access='direct',recl=nch_active*nch_active*3)
+      write(21,rec=1) real(divbig, r_kind)
+   else
+      open(21,file=trim(npair_file),form='unformatted',access='direct',recl=nch_active*nch_active)
+      write(21,rec=1) real(divider, r_kind)
+   endif
+   close(21)
+endif
+
 deallocate(ges_ave,bin_dist,obs_pairs)
 if (cov_method==desroziers) then
    deallocate(anl_ave)
@@ -455,5 +518,6 @@ deallocate(divider)
 if (out_corr) then
    deallocate(Rcorr)
 end if
-if (kreq>zero) deallocate(Rout,eigv, eigs)
+deallocate(eigv, eigs)
+if (kreq>zero) deallocate(Rout)
 end program cov_calc

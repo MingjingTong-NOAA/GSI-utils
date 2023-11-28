@@ -1,24 +1,27 @@
 #!/bin/sh
 #date of first radstat file
-bdate=2022070500
+bdate=2022070100
 #date of last radstat file
-edate=2022080418
+edate=2022073018
 #instrument name, as it would appear in the title of a diag file
 #instr=airs_aqua
 instr=cris-fsr_n20
 #location of radstat file
-exp=s2022_C192_v2p5_emdfdf
-diagdir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/scrub/RadStat/${exp}
+#exp=s2022_C192_v2p5_edmf1ens0
+#exp=s2022_C192_edmf0ens1_RcovdcrisR2p5
+exp=s2022_C192_edmf0ens1_RcovdcrisR2p0_QCold
+diagdir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/scrub/RadDiag/${exp}
 #working directory
 wrkdir=/scratch2/NCEPDEV/stmp3/${USER}/corr_obs_${instr}
+newrun="YES"
 #location the covariance matrix is saved to
-savdir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/noscrub/Rcov/inf3
+savdir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/noscrub/Rcov/cloud1
 #FOV type- 0 for all, 1 for sea, 2 for land, 3 for snow, 
 #4 for mixed (recommended to use 0 for mixed)
 #5 for ice and 6 for snow and ice combined (recommended when using ice)
 type=1
 #cloud 1 for clear FOVs, 2 for clear channels
-cloud=2
+cloud=1
 #absolute value of the maximum allowable sensor zenith angle (degrees)
 angle=30
 #option to output the channel wavenumbers
@@ -27,14 +30,20 @@ wave_out=.true.
 err_out=.true.
 #option to output the correlation matrix
 corr_out=.true.
+#option to output the observation pairs
+npair_out=.true.
 #condition number to recondition Rcov.  Set <0 to not recondition
-kreq=125
+#kreq=125
+kreq=-1
+#condition number to recondition Rcov (< 1.0)
+kreq2=0.0
 #inflation factors, for regular channels, surface channels and water vapor channels
 #infl is applied to all channels if using binary files or a MW instrument
 #set factors equal to 1 to not inflate, or if this channel group is not assimilated
-infl=1.75
-inflsurf=1.9
-inflwv=1.75
+infdiag=.false.
+infl=1.0
+inflsurf=1.0
+inflwv=1.0
 #method to recondition:  1 for trace method, 2 for Weston's second method
 method=1
 #method to compute covariances: 1 for Hollingsworth-Lonnberg, 2 for Desroziers
@@ -44,7 +53,22 @@ time_sep=1.0
 #bin size for obs pairs in km
 bsize=1
 #bin center, in km, needed for Hollingsworth-Lonnberg
-bcen=80
+bcen=100
+if [ $cov_method -eq 1 ]; then
+  wrkdir=/scratch2/NCEPDEV/stmp3/${USER}/corr_obs_${instr}_hl
+  if [ $infdiag = ".true." ]; then
+    savdir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/noscrub/Rcov/${exp}/cloud${cloud}_hl_bcen${bcen}_kreq${kreq}_inf${infl}
+  else
+    savdir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/noscrub/Rcov/${exp}/cloud${cloud}_hl_bcen${bcen}_kreq${kreq}_infR${infl}k${kreq2}
+  fi
+else
+  wrkdir=/scratch2/NCEPDEV/stmp3/${USER}/corr_obs_${instr}
+  if [ $infdiag = ".true." ]; then
+    savdir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/noscrub/Rcov/${exp}/cloud${cloud}_kreq${kreq}_inf${infl}
+  else
+    savdir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/noscrub/Rcov/${exp}/cloud${cloud}_kreq${kreq}_infR${infl}k${kreq2}
+  fi
+fi
 #channel set choice:  0 to only use active channels, 1 to use all channels
 chan_set=0
 #number of processors to use to unpack radstat files-most efficient if # of radstats/$num_proc has a small remainder
@@ -88,10 +112,12 @@ elif [ $type -eq 6 ] ; then
 fi
 wrkdir=${wrkdir}/${stype}
 cdate=$bdate
-if [ -d ${wrkdir} ]; then
+if [[ -d ${wrkdir} && $newrun == "YES" ]]; then
   rm -rf ${wrkdir}
 fi
-mkdir -p ${wrkdir}
+if [ ! -d ${wrkdir} ]; then
+  mkdir -p ${wrkdir}
+fi
 
 
 nt=0
@@ -113,6 +139,7 @@ cp sort_diags.sh $wrkdir
 cp ../../install/bin/cov_calc.x $wrkdir/cov_calc
 
 cd $wrkdir
+if [ $newrun = "YES" ]; then
 num_jobs=$num_proc
 if [ $num_proc -ge $nt ] ; then
    num_jobs=$nt
@@ -252,9 +279,11 @@ bsub -w "done(unpack)" < sort_diags.sh
 else
    exit 1
 fi
+fi
+
 #run cov_calc
 if [ $machine = hera ] ; then
-cat << EOF > params.sh
+cat > params.sh << EOF
 #!/bin/sh
 #SBATCH -A $account
 #SBATCH -o comp_out
@@ -264,7 +293,15 @@ cat << EOF > params.sh
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=$NP
 #SBATCH -J cov_calc
+EOF
+if [ $newrun = "YES" ]; then
+  cat >> params.sh << EOF
 #SBATCH --dependency=after:${jobid##* }
+EOF
+else
+  rm -f comp_err comp_out
+fi
+cat >> params.sh << EOF
 bdate=$bdate
 edate=$edate
 instr=$instr
@@ -277,7 +314,10 @@ angle=$angle
 wave_out=$wave_out
 err_out=$err_out
 corr_out=$corr_out
+npair_out=$npair_out
 kreq=$kreq
+kreq2=$kreq2
+infdiag=$infdiag
 infl=$infl
 inflsurf=$inflsurf
 inflwv=$inflwv
@@ -320,7 +360,10 @@ angle=$angle
 wave_out=$wave_out
 err_out=$err_out
 corr_out=$corr_out
+npair_out=$npair_out
 kreq=$kreq
+kreq2=$kreq2
+infdiag=$infdiag
 infl=$infl
 inflsurf=$inflsurf
 inflwv=$inflwv

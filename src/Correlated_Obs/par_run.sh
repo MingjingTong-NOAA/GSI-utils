@@ -27,7 +27,7 @@ while [[ $nt -le $ntot ]] ; do
 done
 
 ./cov_calc <<EOF
-$nt $type $cloud $angle $instr $wave_out $err_out $corr_out $kreq $infl $inflsurf $inflwv $method $cov_method $chan_set $time_sep $bsize $bcen $netcdf
+$nt $type $cloud $angle $instr $wave_out $err_out $corr_out $npair_out $kreq $kreq2 $infdiag $infl $inflsurf $inflwv $method $cov_method $chan_set $time_sep $bsize $bcen $netcdf
 EOF
 
 set -x
@@ -52,6 +52,8 @@ mv Rcov_$instr Rcov_${instr}_${stype}
 [ -f err_$instr ] && mv err_$instr err_${instr}_${stype}
 [ -f satinfo_err_$instr ] && mv satinfo_err_$instr satinfo_err_${instr}_${stype}
 [ -f chnum_$instr ] && mv chnum_$instr chnum_${instr}_${stype}
+[ -f npair_$instr ] && mv npair_$instr npair_${instr}_${stype}
+[ -f eigs_$instr ] && mv eigs_$instr eigs_${instr}_${stype}
 
 if [ ! -d $savdir/Rcov ]; then
   mkdir -p $savdir/Rcov
@@ -67,4 +69,7 @@ cp -f Rcov_${instr}_${stype} $savdir/Rcov/
 [ -f err_${instr}_${stype} ] && cp -f err_${instr}_${stype} $savdir/Error/
 [ -f satinfo_err_${instr}_${stype} ] && cp -f satinfo_err_${instr}_${stype} $savdir/Error/
 [ -f chnum_${instr}_${stype} ] && cp -f chnum_${instr}_${stype} $savdir/Error/
+[ -f npair_${instr}_${stype} ] && cp -f npair_${instr}_${stype} $savdir/Error/
+[ -f eigs_${instr}_${stype} ] && cp -f eigs_${instr}_${stype} $savdir/Error/
+
 exit 0
