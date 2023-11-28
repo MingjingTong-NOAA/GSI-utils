@@ -2,12 +2,12 @@
 
 set -x
 
-sdate=2022062400
-edate=2022082400
+sdate=2022070100
+edate=2022073018
 ndate=/home/Mingjing.Tong/bin/ndate
 
-for exp in s2022_C192_v2p5_emdfdf; do
-   datadir=/scratch2/GFDL/gfdlscr/Mingjing.Tong/scrub/RadStat/shield_edmfdf
+for exp in s2022_C192_v2p5_edmf1ens0; do
+   datadir=/scratch2/NCEPDEV/stmp1/Mingjing.Tong/RadStat/shield_edmf1ens0
    hpssdir=/NCEPDEV/emc-da/1year/Mingjing.Tong/HERA/scratch/$exp
 
    if [[ ! -d $datadir ]]; then
