@@ -143,34 +143,32 @@ def savefigure(
 
     return
 
+def check(list):
+    return all(i == list[0] for i in list)
+
 def main():
 
     fighome = '/scratch2/GFDL/gfdlscr/Mingjing.Tong/GSI/GSI-utils/src/Correlated_Obs/figures'
     #datadir = '/scratch2/GFDL/gfdlscr/Mingjing.Tong/scrub/RadStat/shield_edmfdf'
     datadir = '/scratch2/GFDL/gfdlscr/Mingjing.Tong/noscrub/Rcov'
     instr = 'cris'
-    config = {'D_org': 'cloud1_kreq-1_infR1.0k0.0',
-              'D_recondition': 'dnoinf',
-              'HL_org': 'hlorg', 'HL_org80': 'hlorg_80',
-              'HL_recondition': 'hlnoinf', 'HL_recondition80': 'hlnoinf_80',
-              'Rcov_inf1.0': 'cloud1_kreq125_infR1.0k0.0',
-              'Rcov_inf1.75': 'cloud1_kreq125_infR1.75k0.0',
-              'Rcov_inf2.0': 'cloud1_kreq125_infR2.0k0.0',
-              'Rcov_inf2.5': 'cloud1_kreq125_infR2.5k0.0',
-              'Diagonal_inf1.75': 'cloud1_kreq125_inf1.75',
-              'Diagonal_inf1.75cch': 'cloud2_kreq125_inf1.75',
-              'Rcov_inf1.0_it2': 'cloud1_kreq125_infR1.0k0.0_iter2',
-              'it1': 'dnoinf_it1', 'it2': 'dnoinf_it2',
-              'Diagnosed': 'org_it2',
-              'Reconditioned': 'dnoinf_it2',
-              'Adjusted': 'inf_it2'
-              }
-
-    #erradj = ['D_org','HL_org','D_recondition','HL_recondition']
-    #erradj = ['HL_org80','HL_recondition80']
-    #erradj = ['D_recondition','Rcov_inf1.75','Rcov_inf2.0','Rcov_inf2.5','Diagonal_inf1.75','Diagonal_inf1.75cch']
-    #erradj = ['Rcov_inf1.0','Rcov_inf1.0_it2']
-    erradj = ['Diagnosed', 'Reconditioned', 'Adjusted']
+    config = {'HL_raw_50km': 'HL_rc_50km',
+              'HL_raw_80km': 'HL_raw_80km',
+              'HL_raw_100km': 'HL_raw_100km',
+              'HL_rc_50km': 'HL_rc_50km',
+              'HL_rc_80km': 'HL_rc_80km',
+              'HL_rc_100km': 'HL_rc_100km',
+              'D_rc': 'D_rc_it1',
+              'D_raw': 'D_raw_it1',
+              'Diagnosed': 'D_raw_it1',
+              'Reconditioned': 'D_rc_it1',
+              'inflated': 'D_rc_inf_it1',
+              'Reconditioned_it2': 'D_rc_it2',
+              'inflated_it2': 'D_rc_inf_it2',
+             }
+    erradj = ['Diagnosed', 'Reconditioned', 'inflated']
+    #erradj = ['HL_raw_50km','HL_raw_80km','HL_raw_100km','D_raw']
+    #erradj = ['HL_rc_50km','HL_rc_80km','HL_rc_100km','D_rc']
     sensor = [f'{instr}-fsr_n20']
     stype = ['sea']
     if len(sensor) != len(erradj):
@@ -207,11 +205,11 @@ def main():
     """ figure setup """
     xticklabel=10
     plotobserr=True
-    plotcorr=False
-    plotobspair=False
+    plotcorr=True
+    plotobspair=True
     """ note that eigenvalues of raw maxtrix could be < 0.0 or a complex number """
-    ploteigval=False
-    ploteigvec=False
+    ploteigval=True
+    ploteigvec=True
     save_figure=True
 
     for i, adj in enumerate(erradj):
@@ -227,7 +225,7 @@ def main():
     figs = []; fignames = []
     chnum=[]; waven=[]; infoerr=[]; derr=[]; corr=[]; npair=[]
     eigs=[]; kreq=[]; infl=[]
-    xl=[]; xl2=[]; labels=[]
+    xl=[]; xl2=[]; labels=[]; titles=[]
     i = 0
     for eadj, sen, st in zip(erradj, sensor, stype): 
         """ read channel number """
@@ -249,59 +247,64 @@ def main():
             err = np.fromfile(f,dtype='>f4')
             infoerr.append(err)
     
-        """ read err """
-        fileName=f'{ferr[i]}'
-        print (fileName)
-        with open(fileName, mode='rb') as f: 
-            err = np.fromfile(f,dtype='>f4')
-            derr.append(err)
+        if plotobserr:
+            """ read err """
+            fileName=f'{ferr[i]}'
+            print (fileName)
+            with open(fileName, mode='rb') as f: 
+                err = np.fromfile(f,dtype='>f4')
+                derr.append(err)
     
-        """ read corr """
-        fileName=f'{fcorr[i]}'
-        print (fileName)
-        with open(fileName,'rb') as f:
-            corrb = np.fromfile(f,dtype='>f4')
-            ni = int(np.sqrt(corrb.size))
-            corr.append(corrb.reshape((ni,ni)))
-            #print ('corr ', corr[i].shape)
-
-        """ read npair """
-        fileName=f'{fnpair[i]}'
-        print (fileName)
-        if os.path.isfile(fileName):
+        if plotcorr:
+            """ read corr """
+            fileName=f'{fcorr[i]}'
+            print (fileName)
             with open(fileName,'rb') as f:
-                npairb = np.fromfile(f,dtype='>f4')
-                print ('npairb ', npairb.shape, config[eadj])
-                if 'hl' in config[eadj]:
-                    ni = int(np.sqrt(npairb.size / 3))
-                    npair.append(npairb.reshape((3,ni,ni)))
-                else:
-                    print ('npairb.size ', npairb.size)
-                    ni = int(np.sqrt(npairb.size))
-                    npair.append(npairb.reshape((ni,ni)))
-        else:
-            npair.append(None)
+                corrb = np.fromfile(f,dtype='>f4')
+                ni = int(np.sqrt(corrb.size))
+                corr.append(corrb.reshape((ni,ni)))
+                #print ('corr ', corr[i].shape)
 
-        """ read eigenvalue """
-        fileName=f'{feigs[i]}'
-        print (fileName)
-        if os.path.isfile(fileName):
-            with open(fileName,'rb') as f:
-                eigsb = np.fromfile(f,dtype='>f4')
-                print (eigsb.shape)
-                kreq.append(eigsb[0])
-                infl.append(eigsb[1])
-                eigs.append(eigsb[2:])
-        else:
-            print (f'missing {fileName}')
-            kreq.append(None)
-            infl.append(None)
-            eigs.append(None)
+        if plotobspair:
+            """ read npair """
+            fileName=f'{fnpair[i]}'
+            print (fileName)
+            if os.path.isfile(fileName):
+                with open(fileName,'rb') as f:
+                    npairb = np.fromfile(f,dtype='>f4')
+                    print ('npairb ', npairb.shape, config[eadj])
+                    if 'hl' in config[eadj] or 'HL' in config[eadj]:
+                        ni = int(np.sqrt(npairb.size / 3))
+                        npair.append(npairb.reshape((3,ni,ni)))
+                    else:
+                        print ('npairb.size ', npairb.size)
+                        ni = int(np.sqrt(npairb.size))
+                        npair.append(npairb.reshape((ni,ni)))
+            else:
+                npair.append(None)
+
+        if ploteigval or ploteigvec:
+            """ read eigenvalue """
+            fileName=f'{feigs[i]}'
+            print (fileName)
+            if os.path.isfile(fileName):
+                with open(fileName,'rb') as f:
+                    eigsb = np.fromfile(f,dtype='>f4')
+                    print (eigsb.shape)
+                    kreq.append(eigsb[0])
+                    infl.append(eigsb[1])
+                    eigs.append(eigsb[2:])
+            else:
+                print (f'missing {fileName}')
+                kreq.append(None)
+                infl.append(None)
+                eigs.append(None)
 
         xl=xl+waven[i].tolist()
         xl2=xl2+chnum[i].tolist()
 
-        labels.append(f'{eadj}_{sensor[i]}_{stype[i]}')
+        titles.append(f'{eadj}_{sensor[i]}_{stype[i]}')
+        labels.append(f'{eadj}')
 
         i+=1
     wn=sorted(list(set(xl))) 
@@ -317,55 +320,69 @@ def main():
         print ('plot obs error')
         fig, ax = plt.subplots(figsize=(5, 5))
         plt.subplots_adjust(bottom=0.2)
+
+        samesensor=check(sensor)
+        samestype=check(stype)
         
         i = 0
         for eadj, sen, st in zip(erradj, sensor, stype):
             x = np.arange(waven[i].size)
             if i == 0 or (i > 0 and not np.array_equal(infoerr[i],infoerr[0])):
-                ax.plot(x,infoerr[i])
+                ax.plot(x,infoerr[i],label='old')
             i+=1
         ax.xaxis.set_major_locator(ticker.FixedLocator(xtick))
-        ax.xaxis.set_ticklabels(xlabel, rotation=45)
+        ax.xaxis.set_ticklabels(xlabel, rotation=45,fontsize=8)
         ax.set_xlabel("Wavenumber $(cm^{-1})$")
         ax.set_ylabel("Error (K)")
+        if samesensor and samestype:
+            ax.set_title(f'{sensor[0]}_{stype[0]}')
+            ax.title.set_size(12)
 
         ax2 = ax.twiny()
         i = 0
         for eadj, sen, st in zip(erradj, sensor, stype):
             x = np.arange(chnum[i].size)
-            ax2.plot(x,derr[i],ls='--',label=labels[i])
+            if samesensor and samestype:
+                ax2.plot(x,derr[i],ls='--',label=labels[i])
+            else:
+                ax2.plot(x,derr[i],ls='--',label=titles[i])
             i+=1
         ax2.xaxis.set_major_locator(ticker.FixedLocator(xtick))
-        ax2.xaxis.set_ticklabels(xlabel2,fontsize=10)
+        ax2.xaxis.set_ticklabels(xlabel2,fontsize=8)
         ax2.set_xlabel("Channel number")
         ax2.legend(loc=2,frameon=False)
-    
+
         figs.append(fig)
-        fignames.append(f'{instr}_observation_error')
+        if samesensor and samestype:
+            fignames.append(f'{sensor[0]}_{stype[0]}_observation_error')
+        else:
+            fignames.append(f'{instr}_observation_error')
 
     """ plot cor matrix """
     if plotcorr:
         print ('plot cor matrix')
         i = 0
         for eadj, sen, st in zip(erradj, sensor, stype):
-            fig, ax = plt.subplots(figsize=(10, 10))
+            fig, ax = plt.subplots(figsize=(6, 6))
+            plt.subplots_adjust(left=0.2,bottom=0.2)
             x = np.arange(waven[i].size)
-            xticks = waven[i][::10]
-            yticks = waven[i][::10]
+            #ncolors = 8
+            ncolors = 40
             im = sns.heatmap(corr[i],
-                 cmap=sns.color_palette("coolwarm",n_colors=8),
+                 cmap=sns.color_palette("coolwarm",n_colors=ncolors),
                  vmin=-1.0, vmax=1.0,
                  xticklabels=False, 
                  yticklabels=False,
                  cbar_kws={"shrink": 0.8},
                  square=True, ax=ax)
-            ax.set(xticks=x[::10], yticks=x[::10])
-            xtl = ax.set_xticklabels(xticks)
-            ytl = ax.set_yticklabels(yticks)
+            ax.set(xticks=xtick, yticks=xtick)
+            xtl = ax.set_xticklabels(xlabel, fontsize=10)
+            ytl = ax.set_yticklabels(xlabel, fontsize=10)
             #ax.tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
             ax.set_xlabel('Wavenumber ($cm^{-1}$)', fontsize=10)
             ax.set_ylabel('Wavenumber ($cm^{-1}$)', fontsize=10)
-            ax.set_title(labels[i])
+            ax.set_title(titles[i])
+            ax.title.set_size(10)
             plt.xticks(rotation=90)
 
             figs.append(fig)
@@ -382,8 +399,6 @@ def main():
                 print (npair[i])
             if npair[i] is not None: 
                 x = np.arange(waven[i].size)
-                xticks = waven[i][::10]
-                yticks = waven[i][::10]
                 if npair[i].ndim > 2:
                     fig, axs = plt.subplots(nrows=1,ncols=2,figsize=(12, 8))
                     ax=axs[0]
@@ -391,25 +406,25 @@ def main():
                 else:
                     fig, ax = plt.subplots(figsize=(8, 8)) 
                     im = ax.matshow(npair[i])
-                ax.set(xticks=x[::10], yticks=x[::10])
-                xtl = ax.set_xticklabels(xticks, rotation=90)
-                ytl = ax.set_yticklabels(yticks)
+                ax.set(xticks=xtick, yticks=xtick)
+                xtl = ax.set_xticklabels(xlabel, rotation=90)
+                ytl = ax.set_yticklabels(xlabel)
                 ax.set_xlabel('Wavenumber ($cm^{-1}$)', fontsize=10)
                 ax.set_ylabel('Wavenumber ($cm^{-1}$)', fontsize=10)
                 plt.colorbar(im, location='bottom', pad=0.1, ax=ax)
-      
+
                 if npair[i].ndim > 2:       
                     ax=axs[1]
                     im = ax.matshow(npair[i][1,:,:])
-                    ax.set(xticks=x[::10], yticks=x[::10])
-                    xtl = ax.set_xticklabels(xticks, rotation=90)
-                    ytl = ax.set_yticklabels(yticks)
+                    ax.set(xticks=xtick, yticks=xtick)
+                    xtl = ax.set_xticklabels(xlabel, rotation=90)
+                    ytl = ax.set_yticklabels(xlabel)
                     ax.set_xlabel('Wavenumber ($cm^{-1}$)', fontsize=10)
                     plt.colorbar(im, location='bottom', pad=0.1, ax=ax)
-    
-                plt.suptitle(labels[i])
+
+                plt.suptitle(titles[i])
                 figs.append(fig)
-                fignames.append(f'{eadj}_{sen}_{stype[i]}_npair_matrix')
+                fignames.append(f'{eadj}_{sen}_{st}_npair_matrix')
                 i+=1
     
     if ploteigval:
@@ -424,16 +439,28 @@ def main():
                 x=range(1,eign+1)
                 fig, ax = plt.subplots(figsize=(8, 8))
                 eigsor=eigs[i][:eign]
-                ax.scatter(x,np.sort(eigsor)[::-1],label='original')
+                ax.plot(x,np.sort(eigsor)[::-1],label='original')
+                print ('eigenvalue org')
+                print (np.sort(eigsor)[::-1])
                 if kreq[i] > 0.0:
                     eigsrg=eigs[i][eign:2*eign] 
                     eigsfn=eigs[i][2*eign:]
-                    ax.scatter(x,np.sort(eigsrg)[::-1],label='recondition')
-                    ax.scatter(x,np.sort(eigsfn)[::-1],label='final')
+                    ax.plot(x,np.sort(eigsrg)[::-1],label='recondition')
+                    ax.plot(x,np.sort(eigsfn)[::-1],label='final')
+                    print ('eigenvalue recondition')
+                    print (np.sort(eigsrg)[::-1])
+                    print ('eigenvalue change due to recondition')
+                    eigdiff = np.sort(eigsrg)[::-1]-np.sort(eigsor)[::-1]
+                    eignorm = eigdiff/np.sort(eigsrg)[::-1]
+                    print (eadj)
+                    print (eignorm)
+                    print (eignorm[eignorm > 1.0e-03])
+                    print (eignorm[eignorm > 1.0e-03].size)
+          
                 ax.legend(frameon=False)
                 ax.set_xlabel('Eigenvector number')
                 ax.set_ylabel('Eigenvalue') 
-                ax.set_title(labels[i])
+                ax.set_title(titles[i])
                 figs.append(fig)
                 fignames.append(f'{eadj}_{sen}_{stype[i]}_eigenvalue')
             i+=1
@@ -464,7 +491,7 @@ def main():
                 x = np.arange(waven[i].size)
                 ax.plot(x,eigenVectors[:,ev])
                 ax.xaxis.set_major_locator(ticker.FixedLocator(xtick))
-                ax.xaxis.set_ticklabels(xlabel, rotation=45,fontsize=6)
+                ax.xaxis.set_ticklabels(xlabel, rotation=45,fontsize=7)
                 if j > 2:
                     ax.set_xlabel("Wavenumber $(cm^{-1})$")
                 if j == 0 or j == 3:
@@ -480,17 +507,17 @@ def main():
                 ax.text(0.015, 0.95, eiginfo,
                     verticalalignment='bottom', horizontalalignment='left',
                     transform=ax.transAxes,
-                    color='black', fontsize=6)
+                    color='black', fontsize=7)
  
                 if j < 3:
                     ax2 = ax.twiny()
                     x = np.arange(chnum[i].size)
                     ax2.plot(x,eigenVectors[:,ev],ls='--',label=labels[i])
                     ax2.xaxis.set_major_locator(ticker.FixedLocator(xtick))
-                    ax2.xaxis.set_ticklabels(xlabel2, rotation=45, fontsize=6)
+                    ax2.xaxis.set_ticklabels(xlabel2, rotation=45, fontsize=7)
                     ax2.set_xlabel("Channel number")
     
-            fig.suptitle(f'{labels[i]}')
+            fig.suptitle(f'{titles[i]}')
             figs.append(fig)
             fignames.append(f'{eadj}_{sen}_{stype[i]}_eigenvector')
             i+=1
