@@ -1469,8 +1469,7 @@ def plot_channel_omfbias(dfin,inst='',statslvl=['satellite','channel'],wndic=Non
         if wndic is not None:
             y2index=[]
             for ch in yindex:
-                y2index.append((ch[0], f'{ch[1]}/{int(wndic[ch[1]])}'))
-                #y2index.append((ch[0], (ch[1],int(wndic[ch[1]]))))
+                y2index.append(f'{ch}, {int(wndic[ch])}')
             yindex = y2index
             if len(statslvl) > 1:
                 ax.set_ylabel('Instrument, Channel/Wavenumber $(cm^{-1})$',fontsize=10)
