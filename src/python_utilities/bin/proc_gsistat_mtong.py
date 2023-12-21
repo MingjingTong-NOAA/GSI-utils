@@ -253,6 +253,7 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
         ncount = cntldf.shape[0]
         """ [:-1] remove whole column [0:2000] stats"""
         profilec=cntldf.mean()[:-1].values
+        xlines = []
         for e,expid in enumerate(labels):
             expdf=data_dict[expid].xs(stat, level='stat')
 
@@ -326,26 +327,28 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                     if stat == 'rms' or stat == 'std':
                         if ncount >= 12:
                             tyidx=yindex+(e-1)*0.05
-                            ax.errorbar(profilen, tyidx, xerr=CI_95n, label=labels[e], color=mc[e], 
-                                        elinewidth=lw,linewidth=lw) 
+                            linex = ax.errorbar(profilen, tyidx, xerr=CI_95n, label=labels[e], color=mc[e], 
+                                                elinewidth=lw,linewidth=lw) 
                         else:
-                            ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
-                                    linewidth=lw, alpha=alpha)
+                            linex = ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                                             linewidth=lw, alpha=alpha)
                     elif stat == 'count':
-                        ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
-                                linewidth=lw, alpha=alpha)
+                        linex = ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                                         linewidth=lw, alpha=alpha)
+                    xlines.append(linex)
             else:
                 if stat == 'rms' or stat == 'std':
                     if ncount >= 12:
-                        ax.errorbar(profile0, yindex, xerr=CI_95, label=labels[e], color=mc[e])
+                        linex = ax.errorbar(profile0, yindex, xerr=CI_95, label=labels[e], color=mc[e])
                     else:
-                        ax.plot(profile0, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
-                                linewidth=lw, alpha=alpha)
+                        linex = ax.plot(profile0, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                                        linewidth=lw, alpha=alpha)
                 elif stat == 'count':
-                    ax.plot(profile, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e], linewidth=lw, alpha=alpha)
+                    linex = ax.plot(profile, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e], linewidth=lw, alpha=alpha)
                 else:
-                    ax.plot(profile0, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
-                            linewidth=lw, alpha=alpha)
+                    linex = ax.plot(profile0, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                                    linewidth=lw, alpha=alpha)
+                xlines.append(linex)
 
             if e == 0 and stat == 'bias':
                 plt.vlines(0.,lmin,lmax,colors='k',linestyles='--',linewidth=lw,label=None)
@@ -359,9 +362,9 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                 else:
                     xmin_,xmax_ = np.min(tmp1),np.max(tmp1)
     
-        if len(pltvar) >=5:
+        if len(pltvar) > 5:
             if ( v in [0,3] ): plt.ylabel('Pressure (hPa)',fontsize=fontsize)
-            if ( v in [3] ): plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
+            if ( v in [5] ): plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
         else:
             if len(pltvar) == 1:
                 plt.ylabel('Pressure (hPa)',fontsize=fontsize)
@@ -465,6 +468,10 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                 verticalalignment='bottom', horizontalalignment='center',
                 transform=ax.transAxes,
                 color='black', fontsize=fontsize+2)
+
+    if not nlegend and len(pltvar) <= 5:
+        #fig.legend(handles=xlines, loc='center', bbox_to_anchor=(0.85, 0.3), frameon=False)
+        plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
 
     return fig
 
@@ -1728,11 +1735,19 @@ def savefigure(
 
     return
 
+def savefigs(figs,fignames):
+    if len(figs) > 0 and len(figs) == len(fignames):
+        for fig,figname in zip(figs,fignames):
+            figname = f'{figdir}/gsistat_{figname}'
+            savefigure(fig,figname,format='png')
+
+    return
+
 if __name__ == '__main__':
 
     global expids,labels,save_figure
     global title_substr
-    global mc,alpha
+    global mc,alpha,figdir
 
     parser = ArgumentParser(description = 'Process gsistat.gdas.YYYYMMDDHH file',formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('-x','--expid',help='experiment ID',type=str,nargs='+',required=True)
@@ -1762,6 +1777,7 @@ if __name__ == '__main__':
     parser.add_argument('-lclr','--linecolors',help='line colors',nargs='+',required=False, default=['k', 'b', 'r', 'g', 'm','c','y'])
     parser.add_argument('-style','--panelstyle',help='panel style',type=str,required=False,default='nappend')
     parser.add_argument('-nlegend','--no_legend',help='plot legend',action='store_true',required=False)
+    parser.add_argument('-figdir','--figdir',help='figure archive directory',type=str,required=False,default='./')
 
     args = parser.parse_args()
 
@@ -1773,6 +1789,7 @@ if __name__ == '__main__':
         archdirs = [archdirs]
     subtypsum = args.subtypsum
     save_figure = args.save_figure
+    figdir = args.figdir
     plot_conv = args.plot_conv
     plot_cnvall = args.plot_cnvall
     plot_anl = args.plot_analysis
@@ -1971,9 +1988,7 @@ if __name__ == '__main__':
             title_substr = '%s-%s' % (bdate.strftime('%Y%m%d%H'),edate.strftime('%Y%m%d%H'))
 
     figs = []; fignames = []
-
     if plot_conv:
-
         if 'ps' in pltvar:
             if plot_anl:
                 fig = plot_ps(ps,ps2=ps_a,pname='ps') ; figs.append(fig) ; fignames.append('ps')
@@ -1987,6 +2002,7 @@ if __name__ == '__main__':
       
         fig = plot_profile(uv,t,q,gps,amv,scrm,stat='bias',pltvar=pltvar,ylog=ylog,nlegend=nlegend) 
         figs.append(fig) ; fignames.append('bias')
+
         if plot_anl:
             fig = plot_profile(uv_a,t_a,q_a,gps_a,amv_a,scrm_a,stat='bias',anl=True,pltvar=pltvar,ylog=ylog,
                                nlegend=nlegend) 
@@ -2028,6 +2044,13 @@ if __name__ == '__main__':
                                    ylog=ylog,nlegend=nlegend) 
                 figs.append(fig) ; fignames.append('rms_anl')
 
+        if save_figure:
+            savefigs(figs,fignames)
+        else:
+            plt.show()
+        plt.close('all')
+    
+    figs = []; fignames = []
     # plot cost function and gradient together
     if plot_costg or plot_costgJo: 
         fig = plot_cost_gradient(minim) ; figs.append(fig) ; fignames.append('cost_gradient')
@@ -2068,9 +2091,17 @@ if __name__ == '__main__':
             if fig is not None:
                 figs.append(fig); fignames.append('rad_assim_diff')
 
+    if len(figs) > 0:
+        if save_figure:
+            savefigs(figs,fignames)
+        else:
+            plt.show()
+        plt.close('all')
+
     if instruments is not None:
         csvdir='/scratch2/GFDL/gfdlscr/Mingjing.Tong/gsidiag/ush/gsistat/data'
         for inst in instruments:
+            figs = []; fignames = []
             if 'cris' in inst or inst == 'iasi' or inst == 'airs':
                 instid = inst
                 if 'cris' in inst:
@@ -2094,6 +2125,7 @@ if __name__ == '__main__':
                     fig = plot_channel_radfit(insts[inst],lendf,inst=inst,stat='rms',normalize=True,obsnum=True,
                                               statslvl=['channel'],wndic=wndic)
                     figs.append(fig); fignames.append(inst+'rmsfit')
+
                     if plot_anl:
                         fig = plot_channel_radfit(insts3[inst],lendf,inst=inst,normalize=True,obsnum=True,
                                                   statslvl=['channel'],wndic=wndic)
@@ -2120,11 +2152,6 @@ if __name__ == '__main__':
                     bfigs,bfignames = plot_channel_omfbias(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic)
                 else:
                     bfigs,bfignames = plot_channel_omfbias(insts[inst],inst=inst,wndic=wndic)
-                if save_figure:
-                    for fig,figname in zip(bfigs,bfignames):
-                        figname = './gsistat_%s' % figname
-                        savefigure(fig,figname,format='png')
-
 
                 """bfigs,bfignames = plot_channel_omf_FGANL(insts[inst],insts2[inst],insts3[inst],stats='std',inst=inst)
                 if save_figure:
@@ -2138,11 +2165,10 @@ if __name__ == '__main__':
                         figname = './gsistat_%s' % figname
                         savefigure(fig,figname,format='png')"""
 
-    if save_figure:
-        for fig,figname in zip(figs,fignames):
-            figname = './gsistat_%s' % figname
-            savefigure(fig,figname,format='png')
-    else:
-        plt.show()
+                if save_figure:
+                    savefigs(figs,fignames)
+                else:
+                    plt.show()
+                plt.close('all')
 
     sys.exit(0)
