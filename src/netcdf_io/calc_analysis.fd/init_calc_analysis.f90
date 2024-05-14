@@ -15,7 +15,7 @@ contains
     !! calc_analysis.nml file in same directory
     !! as executable
     use vars_calc_analysis, only: anal_file, fcst_file, incr_file, use_nemsio_anl, &
-                                  fhr, mype, npes, cliptracers
+                                  fhr, mype, npes, jedi, cliptracers
     implicit none
     ! local variables to this subroutine
     character(len=500) :: datapath = './'
@@ -26,11 +26,12 @@ contains
     integer, parameter :: lunit = 10
     logical :: lexist = .false.
     namelist /setup/ datapath, analysis_filename, firstguess_filename, &
-                     increment_filename, fhr, use_nemsio_anl, cliptracers
+                     increment_filename, fhr, use_nemsio_anl, jedi, cliptracers
 
     fhr = 6 ! default to 6 hour cycle only
     use_nemsio_anl = .false. ! default to using netCDF for background and analysis
-    cliptracers = .false. ! default to clip tracers
+    jedi = .false. ! default to GSI (not JEDI)
+    cliptracers = .false. ! default to clip tracers 
 
     ! read in the namelist
     inquire(file='calc_analysis.nml', exist=lexist)
@@ -67,6 +68,7 @@ contains
       else
         write(6,*) 'writing analysis in netCDF format'
       end if
+      write(6,*) 'Use JEDI format  = ', jedi
     end if
     
   end subroutine read_nml

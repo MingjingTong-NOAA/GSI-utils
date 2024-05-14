@@ -108,7 +108,7 @@ program getsigensmeanp_smooth
   endif
 
   if ( mype == 0 ) then
-     write(6,'(a)')  'Command line input'
+     write(6,'(a,i,a)')  'Command line input for ',iargc(),' arguments'
      write(6,'(a,a)')' datapath    = ',trim(datapath)
      write(6,'(a,a)')' filenameout = ',trim(filenameout)
      write(6,'(a,a)')' fileprefix  = ',trim(fileprefix)
@@ -589,22 +589,27 @@ program getsigensmeanp_smooth
                endif
            endif ! ndims > 2
         enddo  ! nvars
-        deallocate(values_2d, values_3d, values_2d_avg, values_3d_avg)
-        deallocate(values_2d_tmp, values_3d_tmp)
+        if (allocated(values_2d)) deallocate(values_2d)
+        if (allocated(values_3d)) deallocate(values_3d)
+        if (allocated(values_2d_avg)) deallocate(values_2d_avg)
+        if (allocated(values_3d_avg)) deallocate(values_3d_avg)
+        if (allocated(values_2d_tmp)) deallocate(values_2d_tmp)
+        if (allocated(values_3d_tmp)) deallocate(values_3d_tmp)
         if (dosmooth) then
            deallocate(rwork_spc)
            call close_dataset(dseto_smooth)
         endif
         if (write_spread_ncio) then
-           deallocate(values_2d_sprd, values_3d_sprd)
+           if (allocated(values_2d_sprd)) deallocate(values_2d_sprd)
+           if (allocated(values_3d_sprd)) deallocate(values_3d_sprd)
         endif
         if (mype == 0) then
-           call close_dataset(dseto)
+           call close_dataset(dseto, errcode=iret)
            t2 = mpi_wtime()
            print *,'time to write ens mean on root',t2-t1
            write(6,'(3a,i5)')'Write ncio ensemble mean ',trim(filenameout),' iret = ', iret
            if (write_spread_ncio) then
-             call close_dataset(dseto_sprd)
+             call close_dataset(dseto_sprd, errcode=iret)
               write(6,'(3a,i5)')'Write ncio ensemble spread ',trim(filenameoutsprd),' iret = ', iret
            endif
         endif
@@ -649,18 +654,19 @@ program getsigensmeanp_smooth
               end if
            end if ! end if 3D var
         end do ! end loop through variables
-        deallocate(values_3d, values_3d_avg)
-        deallocate(values_3d_tmp)
+        if (allocated(values_3d))     deallocate(values_3d)
+        if (allocated(values_3d_avg)) deallocate(values_3d_avg)
+	if (allocated(values_3d_tmp)) deallocate(values_3d_tmp)
         if (write_spread_ncio) then
-           deallocate(values_3d_sprd)
+           if (allocated(values_3d_sprd)) deallocate(values_3d_sprd)
         endif
         if (mype == 0) then
-           call close_dataset(dseto)
+           call close_dataset(dseto,errcode=iret)
            t2 = mpi_wtime()
            print *,'time to write ens mean on root',t2-t1
            write(6,'(3a,i5)')'Write increment ensemble mean ',trim(filenameout),' iret = ', iret
            if (write_spread_ncio) then
-             call close_dataset(dseto_sprd)
+             call close_dataset(dseto_sprd,errcode=iret)
               write(6,'(3a,i5)')'Write increment ensemble spread ',trim(filenameoutsprd),' iret = ', iret
            endif
         endif

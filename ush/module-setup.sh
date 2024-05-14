@@ -18,7 +18,14 @@ elif [[ $MACHINE_ID = hera* ]] ; then
 elif [[ $MACHINE_ID = orion* ]] ; then
     # We are on Orion
     if ( ! eval module help > /dev/null 2>&1 ) ; then
-        source /apps/lmod/init/bash
+        source /apps/lmod/lmod/init/bash
+    fi
+    module purge
+
+elif [[ $MACHINE_ID = hercules* ]] ; then
+    # We are on Hercules
+    if ( ! eval module help > /dev/null 2>&1 ) ; then
+        source /apps/other/lmod/lmod/init/bash
     fi
     module purge
 
@@ -97,6 +104,13 @@ elif [[ $MACHINE_ID = discover* ]]; then
     export SPACK_ROOT=/discover/nobackup/mapotts1/spack
     export PATH=$PATH:$SPACK_ROOT/bin
     . $SPACK_ROOT/share/spack/setup-env.sh
+
+elif [[ $MACHINE_ID = noaacloud* ]]; then
+    # We are on NOAA Cloud
+    if ( ! eval module help > /dev/null 2>&1 ) ; then
+        source /apps/lmod/8.5.2/init/bash
+    fi
+    module purge
 
 else
     echo WARNING: UNKNOWN PLATFORM 1>&2
