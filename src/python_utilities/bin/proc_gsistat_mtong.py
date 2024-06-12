@@ -253,7 +253,6 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
         ncount = cntldf.shape[0]
         """ [:-1] remove whole column [0:2000] stats"""
         profilec=cntldf.mean()[:-1].values
-        xlines = []
         for e,expid in enumerate(labels):
             expdf=data_dict[expid].xs(stat, level='stat')
 
@@ -327,28 +326,26 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                     if stat == 'rms' or stat == 'std':
                         if ncount >= 12:
                             tyidx=yindex+(e-1)*0.05
-                            linex = ax.errorbar(profilen, tyidx, xerr=CI_95n, label=labels[e], color=mc[e], 
-                                                elinewidth=lw,linewidth=lw) 
+                            ax.errorbar(profilen, tyidx, xerr=CI_95n, label=labels[e], color=mc[e], 
+                                        elinewidth=lw,linewidth=lw) 
                         else:
-                            linex = ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
-                                             linewidth=lw, alpha=alpha)
+                            ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                                    linewidth=lw, alpha=alpha)
                     elif stat == 'count':
-                        linex = ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
-                                         linewidth=lw, alpha=alpha)
-                    xlines.append(linex)
+                        ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                                linewidth=lw, alpha=alpha)
             else:
                 if stat == 'rms' or stat == 'std':
                     if ncount >= 12:
-                        linex = ax.errorbar(profile0, yindex, xerr=CI_95, label=labels[e], color=mc[e])
+                        ax.errorbar(profile0, yindex, xerr=CI_95, label=labels[e], color=mc[e])
                     else:
-                        linex = ax.plot(profile0, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
-                                        linewidth=lw, alpha=alpha)
+                        ax.plot(profile0, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                                linewidth=lw, alpha=alpha)
                 elif stat == 'count':
-                    linex = ax.plot(profile, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e], linewidth=lw, alpha=alpha)
+                    ax.plot(profile, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e], linewidth=lw, alpha=alpha)
                 else:
-                    linex = ax.plot(profile0, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
-                                    linewidth=lw, alpha=alpha)
-                xlines.append(linex)
+                    ax.plot(profile0, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                            linewidth=lw, alpha=alpha)
 
             if e == 0 and stat == 'bias':
                 plt.vlines(0.,lmin,lmax,colors='k',linestyles='--',linewidth=lw,label=None)
@@ -363,14 +360,15 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                     xmin_,xmax_ = np.min(tmp1),np.max(tmp1)
     
         if len(pltvar) > 5:
-            if ( v in [0,3] ): plt.ylabel('Pressure (hPa)',fontsize=fontsize)
-            if ( v in [5] ): plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
+            if v in [0,3]: plt.ylabel('Pressure (hPa)',fontsize=fontsize)
+            if v in [5] and not nlegend: plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
+        elif len(pltvar) > 3:
+            if v in [0,2]: plt.ylabel('Pressure (hPa)',fontsize=fontsize)
+            if v in [3] and not nlegend: plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
         else:
-            if len(pltvar) == 1:
+            if v == 0:
                 plt.ylabel('Pressure (hPa)',fontsize=fontsize)
-            else:
-                if ( v in [0,2] ): plt.ylabel('Pressure (hPa)',fontsize=fontsize)
-            if ( v in [0] and not nlegend ): plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
+            if v == len(pltvar) - 1 and not nlegend: plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
 
         if ( var == 'uv' ):
             var_unit = 'm/s'
@@ -469,9 +467,9 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                 transform=ax.transAxes,
                 color='black', fontsize=fontsize+2)
 
-    if not nlegend and len(pltvar) <= 5:
-        #fig.legend(handles=xlines, loc='center', bbox_to_anchor=(0.85, 0.3), frameon=False)
-        plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
+    figlegend = (not nlegend and len(pltvar) == 5)
+    if figlegend:
+        fig.legend(loc='center',bbox_to_anchor=(0.85, 0.3),frameon=False)
 
     return fig
 

@@ -413,6 +413,7 @@ if __name__ == '__main__':
     parser.add_argument('-cycfreq','--cycle_freq',help='cycle frequency',type=str,required=False,default='6H')
     parser.add_argument('-d','--dump',help='forecast type gfs or gdas',type=str,nargs='+',required=False,default='gdas')
     parser.add_argument('-cg','--plot_costg',help='plot cost function',action='store_true',required=False)
+    parser.add_argument('-oz','--plot_oz',help='plot ozone',action='store_true',required=False)
     parser.add_argument('-rad','--plot_rad',help='plot satellite radiance',action='store_true',required=False)
 
     args = parser.parse_args()
@@ -431,6 +432,7 @@ if __name__ == '__main__':
     if not type(cdumps) is list:
         cdumps = [cdumps]
     plot_costg = args.plot_costg
+    plot_oz = args.plot_oz
     plot_rad = args.plot_rad
 
     if ( edate < bdate ):
@@ -473,8 +475,10 @@ if __name__ == '__main__':
         t[expid] = get_data1(gsistat[expid],'t',it=1,use='asm',typ=ttyp)
         q[expid] = get_data1(gsistat[expid],'q',it=1,use='asm',typ=qtyp)
         minim[expid] = get_data2(gsistat[expid],'cost')
-        oz[expid] = get_data2(gsistat[expid],'oz',select=[1],level=['it'])
-        rad[expid] = get_data2(gsistat[expid],'rad',select=[1],level=['it'])
+        if plot_oz:
+            oz[expid] = get_data2(gsistat[expid],'oz',select=[1],level=['it'])
+        if plot_rad: 
+            rad[expid] = get_data2(gsistat[expid],'rad',select=[1],level=['it'])
 
     # If instruments are desired, get them too
     if instruments is not None:

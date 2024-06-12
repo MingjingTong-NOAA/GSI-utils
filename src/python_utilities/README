@@ -5,3 +5,11 @@ lib/
 
 bin/
    proc_gsistat.py - process gsistat files and make quick plots
+
+the stats are computed as sum of data types
+
+bin/
+   proc_gsistat_mtong.py - developed based on proc_gsistat.py with many more capabilities added
+
+the state are computed as mean of data types (sum(stat[type]*count[type])/sum(count[type])
+
