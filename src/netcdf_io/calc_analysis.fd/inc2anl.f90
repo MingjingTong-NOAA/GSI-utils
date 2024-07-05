@@ -253,9 +253,9 @@ contains
       end do
       ! clean up and close
       if ( jedi ) then
-        deallocate(work3d_inc_jedi)
+        if (allocated(work3d_inc_jedi)) deallocate(work3d_inc_jedi)
       else
-        deallocate(work3d_inc_gsi)
+        if (allocated(work3d_inc_gsi)) deallocate(work3d_inc_gsi)
       end if
       deallocate(work3d_bg)
       call close_dataset(incncfile)
