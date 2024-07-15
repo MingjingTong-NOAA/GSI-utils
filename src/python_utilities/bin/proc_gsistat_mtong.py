@@ -136,7 +136,7 @@ def get_inst_data(gsistat,instname,select=None,level=None,plotanl=False,usedonly
             if select is not None:
                 tmp = tmp.xs(select,level=level,drop_level=False)
             df.append(tmp)
-    
+
     if not tmp.empty:
         lendf = len(df)
         if lendf != 0:
@@ -229,6 +229,9 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
     if ylog:
         lmin,lmax = 1100,50
 
+    figlegend = (not nlegend and len(pltvar) == 5)
+    ilegend = len(pltvar) - 1
+
     for v,var in enumerate(pltvar):
         if var == 'q':
             indexlevs = [1200, 1000, 950, 900, 850, 800, 700, 600, 500, 400, 300, 200]
@@ -316,6 +319,11 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
             else:
                 yindex = ya+0.5
 
+            if v == ilegend:
+                tlabel=labels[e]
+            else:
+                tlabel=None
+
             if (normalize or pairdiff) and len(labels) > 1:
                 if e == 0:
                     if pairdiff:
@@ -326,25 +334,25 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                     if stat == 'rms' or stat == 'std':
                         if ncount >= 12:
                             tyidx=yindex+(e-1)*0.05
-                            ax.errorbar(profilen, tyidx, xerr=CI_95n, label=labels[e], color=mc[e], 
+                            ax.errorbar(profilen, tyidx, xerr=CI_95n, label=tlabel, color=mc[e], 
                                         elinewidth=lw,linewidth=lw) 
                         else:
-                            ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                            ax.plot(profilen, yindex, marker='o', label=tlabel, color=mc[e], mfc=mc[e], mec=mc[e],
                                     linewidth=lw, alpha=alpha)
                     elif stat == 'count':
-                        ax.plot(profilen, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                        ax.plot(profilen, yindex, marker='o', label=tlabel, color=mc[e], mfc=mc[e], mec=mc[e],
                                 linewidth=lw, alpha=alpha)
             else:
                 if stat == 'rms' or stat == 'std':
                     if ncount >= 12:
-                        ax.errorbar(profile0, yindex, xerr=CI_95, label=labels[e], color=mc[e])
+                        ax.errorbar(profile0, yindex, xerr=CI_95, label=tlabel, color=mc[e])
                     else:
-                        ax.plot(profile0, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                        ax.plot(profile0, yindex, marker='o', label=tlabel, color=mc[e], mfc=mc[e], mec=mc[e],
                                 linewidth=lw, alpha=alpha)
                 elif stat == 'count':
-                    ax.plot(profile, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e], linewidth=lw, alpha=alpha)
+                    ax.plot(profile, yindex, marker='o', label=tlabel, color=mc[e], mfc=mc[e], mec=mc[e], linewidth=lw, alpha=alpha)
                 else:
-                    ax.plot(profile0, yindex, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                    ax.plot(profile0, yindex, marker='o', label=tlabel, color=mc[e], mfc=mc[e], mec=mc[e],
                             linewidth=lw, alpha=alpha)
 
             if e == 0 and stat == 'bias':
@@ -361,14 +369,10 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
     
         if len(pltvar) > 5:
             if v in [0,3]: plt.ylabel('Pressure (hPa)',fontsize=fontsize)
-            if v in [5] and not nlegend: plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
         elif len(pltvar) > 3:
             if v in [0,2]: plt.ylabel('Pressure (hPa)',fontsize=fontsize)
-            if v in [3] and not nlegend: plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
         else:
-            if v == 0:
-                plt.ylabel('Pressure (hPa)',fontsize=fontsize)
-            if v == len(pltvar) - 1 and not nlegend: plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
+            if v == 0: plt.ylabel('Pressure (hPa)',fontsize=fontsize)
 
         if ( var == 'uv' ):
             var_unit = 'm/s'
@@ -467,9 +471,10 @@ def plot_profile(uv, t, q, gps, amv, scrm, stat='rms', anl=False, normalize=Fals
                 transform=ax.transAxes,
                 color='black', fontsize=fontsize+2)
 
-    figlegend = (not nlegend and len(pltvar) == 5)
+        if not figlegend and not nlegend and v == ilegend: plt.legend(loc=0,fontsize='small',numpoints=1,frameon=False)
+  
     if figlegend:
-        fig.legend(loc='center',bbox_to_anchor=(0.85, 0.3),frameon=False)
+        fig.legend(loc='center',bbox_to_anchor=(0.75, 0.3),frameon=False)
 
     return fig
 
@@ -1268,6 +1273,8 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',stat='std',normalize=False
     cntldf=dfin[labels[0]][[statvar]].astype(float)
     #print (cntldf)
     #cntldf=cntldf.dropna()
+    #cidx = cntldf.index.get_level_values('channel').to_list()
+    #print (cidx)
     if dfina is not None:
         cntldfa=dfina[labels[0]][[statvar]].astype(float)
     #omfstdwci=cntldf.groupby(level=['satellite','channel']).mean()
@@ -1758,7 +1765,7 @@ if __name__ == '__main__':
     parser.add_argument('-m','--mode',help='gsi or enkf',type=str,nargs='+',required=False,default='gsi',)
     parser.add_argument('-s','--save_figure',help='save figures as png and pdf',action='store_true',required=False)
     parser.add_argument('-i','--instruments',help='list of instruments to show',nargs='+',required=False, default=None)
-    parser.add_argument('-u','--plot_used',help='plot used radiance channels',action='store_true',required=False)
+    parser.add_argument('-allch','--plot_all_channel',help='plot all radiance channels',action='store_true',required=False)
     parser.add_argument('-c','--plot_conv',help='plot stats for conventional data',action='store_true',required=False)
     parser.add_argument('-cnvall','--plot_cnvall',help='plot all conventional uv, t, q',action='store_true',required=False)
     parser.add_argument('-cg','--plot_costg',help='plot cost function',action='store_true',required=False)
@@ -1797,7 +1804,8 @@ if __name__ == '__main__':
     if not type(modes) is list:
         modes= [ modes ]
     instruments = args.instruments
-    plot_used = args.plot_used
+    plot_all_channel = args.plot_all_channel
+    plot_used = not plot_all_channel
     single_cycle = args.singe_cycle
     random_cycle = args.random_cycle
     cycle_freq = args.cycle_freq
@@ -1948,6 +1956,7 @@ if __name__ == '__main__':
 
 
     # If instruments are desired, get them too
+    print ('reading instrument')
     if instruments is not None:
         insts, insts2, insts3 = {}, {}, {}
         for inst in instruments:
@@ -2150,6 +2159,10 @@ if __name__ == '__main__':
                     bfigs,bfignames = plot_channel_omfbias(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic)
                 else:
                     bfigs,bfignames = plot_channel_omfbias(insts[inst],inst=inst,wndic=wndic)
+                if save_figure:
+                    for fig,figname in zip(bfigs,bfignames):
+                        figname = './gsistat_%s' % figname
+                        savefigure(fig,figname,format='png')
 
                 """bfigs,bfignames = plot_channel_omf_FGANL(insts[inst],insts2[inst],insts3[inst],stats='std',inst=inst)
                 if save_figure:

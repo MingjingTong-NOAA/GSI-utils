@@ -307,8 +307,8 @@ class GSIstat(object):
             otype = self.extract(obtype)
             self._cache[obtype] = otype
 
-        # get usage 
-        df_usage = self._get_instrument_usage(instrument) 
+        # get usage (use observation error to identify used channels)
+        #df_usage = self._get_instrument_usage(instrument) 
 
         instruments = sorted(otype.index.get_level_values('instrument').unique())
         satellites  = sorted(otype.index.get_level_values('satellite' ).unique())
@@ -382,8 +382,9 @@ class GSIstat(object):
     
             #_pd.set_option('display.max_rows', None)
             if usedonly:
-                tmp = df.join(df_usage, how='inner')
-                df = tmp.loc[tmp['use'] == 1].drop(['use'],axis=1)
+                df = df.loc[df['oberr'] > 0.]
+                #tmp = df.join(df_usage, how='inner')
+                #df = tmp.loc[tmp['use'] == 1].drop(['use'],axis=1)
 
             # Add datetime index
             df = self._add_datetime_index(df)
