@@ -357,26 +357,44 @@ class GSIstat(object):
             lendf = len(df)
             if lendf != 0:
                 itlist=df['it'].unique()
-                counts=df['it'].value_counts()
-                nouter = int(lendf / len(df['it'].unique()))
+                channels_itcounts=df['it'].value_counts()
+                channels_num = len(channels_itcounts)
+                nouter = int(lendf / channels_num)
+                if nouter < channels_itcounts.max():
+                    print ("WARNING some channels only appear in one of the outer loops, this could be a bug in GSI code")
                 if plotanl and nouter < 3:
                     for k in itlist:
-                        if counts[k] < 3:
-                            print ('%s %s appreas in only %s outer iteration'%(inst,k,counts[k]))
+                        if channels_itcounts[k] < 3:
+                            print ('%s %s appreas in only %s outer iteration'%(inst,k,channels_itcounts[k]))
                             print ('drop the record')
                             df = df[df.it != k] 
                     lendf = len(df)
-                    nouter = int(lendf / len(df['it'].unique()))
+                    nouter = int(lendf / channels_num)
     
             if lendf != 0:
                 douter = int(lendf / nouter)
                 it = _np.zeros(lendf, dtype=int)
-                for i in range(nouter):
-                    its = douter * i
-                    ite = douter * (i+1)
-                    it[its:ite] = i+1
+                if not plotanl and nouter < 3:
+                    douter = channels_num
+                    douter2 = int((lendf - channels_num) / 2)
+                    for i in range(3):
+                        if i == 0:
+                            its = 0
+                            ite = douter
+                        elif i == 1:
+                            its = douter
+                            ite = douter + douter2
+                        else:
+                            its = douter + douter2
+                            ite = douter2 * 2 + douter
+                        it[its:ite] = i+1
+                else:
+                    for i in range(nouter):
+                        its = douter * i
+                        ite = douter * (i+1)
+                        it[its:ite] = i+1
                 df['it'] = it
-        
+
                 df = df[['it', 'instrument', 'satellite', 'channel', 'nassim', 'nrej', 'oberr', 'OmF_wobc', 'OmF_bc', 'OmFbc_rms', 'OmFbc_std']]
                 df.set_index(['it', 'instrument', 'satellite', 'channel'],inplace=True)
     

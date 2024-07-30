@@ -1096,7 +1096,8 @@ def plot_sat_diff(dfin,otype=''):
         lc = mc[0] if nclm == 1 else mc[:nclm]
     
         fig1,ax1 = plt.subplots(figsize=(10,8))
-        nobsdiff.plot(ax=ax1,kind='barh',color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+        #nobsdiff.plot(ax=ax1,kind='barh',color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+        nobsdiff.plot(ax=ax1,kind='barh',alpha=alpha,fontsize=12,edgecolor='none')
         #nobsdiff.plot(ax=ax1,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
         titlestr = 'Normalized number of assimilated %s observations \n%s' % (otype,title_substr)
         ax1.set_title(titlestr,fontsize='x-large')
@@ -1156,7 +1157,8 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff
 
     fig,ax = plt.subplots(figsize=(10,12))
     #obscount.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
-    obscount.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+    #obscount.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+    obscount.plot(ax=ax,kind='barh',alpha=alpha,fontsize=12,edgecolor='none')
     titlestr = 'Assimilated: # of %s observations\n%s' % (inst.upper(),title_substr)
     ax.set_title(titlestr,fontsize='x-large')
     if len(statslvl) == 1:
@@ -1380,7 +1382,8 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',stat='std',normalize=False
                     color='black', fontsize=12)
     else:
         #stddiff.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
-        stddiff.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+        #stddiff.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+        stddiff.plot(ax=ax,kind='barh',alpha=alpha,fontsize=12,edgecolor='none')
         yticklabels_new = get_yticklabels_new(ax)
         ax.set_yticklabels(yticklabels_new,fontsize=8)
 
@@ -1421,7 +1424,9 @@ def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel'],wobc=False,
 
     fig,ax = plt.subplots(figsize=(10,8))
     #omfbc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
-    omfbc.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+    #omfbc.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='none',linewidth=0.0)
+    #omfbc.plot(ax=ax,kind='barh',width=0.5,color=lc,fontsize=12,edgecolor='none')
+    omfbc.plot(ax=ax,kind='barh',width=0.5,fontsize=12,edgecolor='none')
     if wobc:
         titlestr = 'OmF bias w/o BC of %s observations\n%s' % (inst.upper(),title_substr)
     else:
@@ -1476,7 +1481,8 @@ def plot_channel_omfbias(dfin,inst='',statslvl=['satellite','channel'],wndic=Non
         lc = mc[:2]
         fig,ax = plt.subplots(figsize=(10,8))
         #omfbc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
-        omfbc.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+        #omfbc.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
+        omfbc.plot(ax=ax,kind='barh',alpha=alpha,fontsize=12,edgecolor='none')
         yindex=omfbc.index.values.tolist()
         if wndic is not None:
             y2index=[]
