@@ -23,7 +23,7 @@
 !---------------------------------------------------------------------
 
  use netcdf
- use mpi
+ use mpi_f08
 #ifdef IP_V4
  use ip_mod, only: ipolates, ipolatev
 #endif
@@ -40,7 +40,6 @@
 
  character(len=128) :: outfile, infile
  character(len=11)  :: records(num_recs) 
- integer :: nvar, num_recs_actual
 
  integer :: i, j, mi, iret, mo, rec
  integer :: lon_in, lat_in
@@ -58,14 +57,16 @@
  integer :: id_t_inc_out, id_sphum_inc_out
  integer :: id_liq_wat_inc_out, id_o3mr_inc_out
  integer :: id_icmr_inc_out, id_dim
- integer :: id_rwmr_inc_out, id_snmr_inc_out
- integer :: id_grle_inc_out
+ integer :: id_rwmr_inc_out, id_snmr_inc_out, id_grle_inc_out
  integer :: header_buffer_val = 16384
  integer :: kgds_in(200), kgds_out(200)
  integer :: ip, ipopt(20), no
+ integer :: klev
  integer, allocatable :: ibi(:), ibo(:), levs(:)
 
- integer :: mpierr, mype, npes, mpistat(mpi_status_size)
+ integer :: mpierr, mype, npes
+
+ type (MPI_Status) :: mpistat
 
  logical*1, allocatable :: li(:,:), lo(:,:)
 
@@ -78,14 +79,17 @@
  real(8), allocatable :: slat(:), wlat(:)
  real(8), allocatable :: rlon(:), rlat(:), crot(:), srot(:)
  real(8), allocatable :: gi(:,:), gi2(:,:), go(:,:), go2(:,:), go3(:,:)
+ real(8), allocatable :: send_layer(:), recv_layer(:)
 
+ logical :: readvar
 
  ! NOTE: u_inc,v_inc must be consecutive
  data records /'u_inc', 'v_inc', 'delp_inc', 'delz_inc', 'T_inc', &
-               'sphum_inc', 'liq_wat_inc', 'o3mr_inc', 'icmr_inc',&
-               'rwmr_inc', 'snmr_inc', 'grle_inc'/
+               'sphum_inc', 'liq_wat_inc', 'o3mr_inc', 'icmr_inc', &
+               'rwmr_inc', 'snmr_inc', 'grle_inc' /
 
- namelist /setup/ lon_out, lat_out, outfile, infile, lev, nvar
+ namelist /setup/ lon_out, lat_out, outfile, infile, lev
+
 
 !-----------------------------------------------------------------
 ! MPI initialization
@@ -99,9 +103,6 @@ call mpi_comm_size(mpi_comm_world, npes, mpierr)
 ! with data below.
 !-----------------------------------------------------------------
 
- nvar=10
- num_recs_actual=9
-
  if (mype == npes-1)  call w3tagb('INTERP_INC', 2019, 100, 0, 'EMC')
 
  if (mype == npes-1) print*,'- READ SETUP NAMELIST'
@@ -112,8 +113,6 @@ call mpi_comm_size(mpi_comm_world, npes, mpierr)
    stop 44
  endif
  close (43)
-
- if (nvar > 10) num_recs_actual=num_recs
 
  if (mype == npes-1) print*,"- WILL INTERPOLATE TO GAUSSIAN GRID OF DIMENSION ",lon_out, lat_out
 
@@ -196,17 +195,15 @@ call mpi_comm_size(mpi_comm_world, npes, mpierr)
    error = nf90_def_var(ncid_out, 'icmr_inc', nf90_float, (/dim_lon_out,dim_lat_out,dim_lev_out/), id_icmr_inc_out)
    call netcdf_err(error, 'defining variable icmr_inc for file='//trim(outfile) )
 
-   if (nvar > 10) then
-      error = nf90_def_var(ncid_out, 'rwmr_inc', nf90_float, (/dim_lon_out,dim_lat_out,dim_lev_out/), id_rwmr_inc_out)
-      call netcdf_err(error, 'defining variable rwmr_inc for file='//trim(outfile))
-
-      error = nf90_def_var(ncid_out, 'snmr_inc', nf90_float, (/dim_lon_out,dim_lat_out,dim_lev_out/), id_snmr_inc_out)
-      call netcdf_err(error, 'defining variable snmr_inc for file='//trim(outfile))
-
-      error = nf90_def_var(ncid_out, 'grle_inc', nf90_float, (/dim_lon_out,dim_lat_out,dim_lev_out/), id_grle_inc_out)
-      call netcdf_err(error, 'defining variable grle_inc for file='//trim(outfile))
-   end if
+   error = nf90_def_var(ncid_out, 'rwmr_inc', nf90_float, (/dim_lon_out,dim_lat_out,dim_lev_out/), id_rwmr_inc_out)
+   call netcdf_err(error, 'defining variable rwmr_inc for file='//trim(outfile) )
   
+   error = nf90_def_var(ncid_out, 'snmr_inc', nf90_float, (/dim_lon_out,dim_lat_out,dim_lev_out/), id_snmr_inc_out)
+   call netcdf_err(error, 'defining variable snmr_inc for file='//trim(outfile) )
+
+   error = nf90_def_var(ncid_out, 'grle_inc', nf90_float, (/dim_lon_out,dim_lat_out,dim_lev_out/), id_grle_inc_out)
+   call netcdf_err(error, 'defining variable grle_inc for file='//trim(outfile) )
+
    error = nf90_put_att(ncid_out, nf90_global, 'source', 'GSI')
    call netcdf_err(error, 'defining source attribute for file='//trim(outfile) )
   
@@ -359,21 +356,35 @@ call mpi_comm_size(mpi_comm_world, npes, mpierr)
  allocate(go(mo,lev))
  allocate(go2(mo,lev))
  allocate(go3(mo,lev))
+ allocate(send_layer(mo))
+ allocate(recv_layer(mo))
 
  call mpi_barrier(mpi_comm_world, mpierr)
- do rec = 1, num_recs_actual
+ do rec = 1, num_recs
 
    ! skip v_inc (done with u_inc, which comes first)
    if (trim(records(rec)) .eq. 'v_inc') cycle
 
    if (mype == rec-1) then
      print*,'- PROCESS RECORD: ', trim(records(rec))
+     readvar = .true.
   
      error = nf90_inq_varid(ncid_in, trim(records(rec)), id_var)
-     call netcdf_err(error, 'inquiring ' // trim(records(rec)) // ' id for file='//trim(infile) )
-     error = nf90_get_var(ncid_in, id_var, dummy_in)
-     call netcdf_err(error, 'reading ' //  trim(records(rec)) // ' for file='//trim(infile) )
-  
+     ! handle missing hydrometeor increments
+     if (error .ne. 0) then
+       if (ANY((/ 'rwmr_inc', 'snmr_inc', 'grle_inc' /) == trim(records(rec)))) then
+         print *, 'WARNING: ', trim(records(rec)), ' is missing in increment file. Skipping.'
+         readvar = .false.
+       else
+         call netcdf_err(error, 'inquiring ' // trim(records(rec)) // ' id for file='//trim(infile) )
+       end if
+     end if
+     if (readvar) then
+       error = nf90_get_var(ncid_in, id_var, dummy_in)
+       call netcdf_err(error, 'reading ' //  trim(records(rec)) // ' for file='//trim(infile) )
+     else
+       dummy_in(:,:,:) = 0.0
+     end if
   
      ip = 0 ! bilinear
      ipopt = 0
@@ -406,10 +417,18 @@ call mpi_comm_size(mpi_comm_world, npes, mpierr)
           print*,'FATAL ERROR: ipolatev returned wrong number of pts ',no
           stop 77
         endif
-        call mpi_send(go(1,1), size(go), mpi_double_precision, &
-                      npes-1, 1000+rec, mpi_comm_world, mpierr)
-        call mpi_send(go3(1,1), size(go3), mpi_double_precision, &
-                      npes-1, 2000+rec, mpi_comm_world, mpierr)
+
+        do klev=1, lev
+          send_layer=go(:,klev)
+          call mpi_send(send_layer, size(send_layer), mpi_double_precision, &
+                        npes-1, 1000+rec, mpi_comm_world, mpierr)
+        enddo
+
+        do klev=1, lev
+          send_layer=go3(:,klev)
+          call mpi_send(send_layer, size(send_layer), mpi_double_precision, &
+                        npes-1, 2000+rec, mpi_comm_world, mpierr)
+        enddo
      else
         call ipolates(ip, ipopt, kgds_in, kgds_out, mi, mo, &
                    lev, ibi, li, gi, no, rlat, rlon, ibo, &
@@ -424,13 +443,19 @@ call mpi_comm_size(mpi_comm_world, npes, mpierr)
         endif
         !dummy_out = reshape(go, (/lon_out,lat_out,lev/))
         !print *, lon_out, lat_out, lev, 'send'
-        call mpi_send(go(1,1), size(go), mpi_double_precision, &
-                      npes-1, 1000+rec, mpi_comm_world, mpierr)
+        do klev=1, lev
+          send_layer=go(:,klev)
+          call mpi_send(send_layer, size(send_layer), mpi_double_precision, &
+                        npes-1, 1000+rec, mpi_comm_world, mpierr)
+        enddo
      endif
    else if (mype == npes-1) then
      !print *, lon_out, lat_out, lev, 'recv'
-     call mpi_recv(go2(1,1), size(go2), mpi_double_precision, &
+     do klev=1, lev
+       call mpi_recv(recv_layer, size(recv_layer), mpi_double_precision, &
                    rec-1, 1000+rec, mpi_comm_world, mpistat, mpierr)
+       go2(:,klev) = recv_layer
+     enddo
      dummy_out = reshape(go2, (/lon_out,lat_out,lev/))
      error = nf90_inq_varid(ncid_out, trim(records(rec)), id_var)
      call netcdf_err(error, 'inquiring ' // trim(records(rec)) // ' id for file='//trim(outfile) )
@@ -438,8 +463,11 @@ call mpi_comm_size(mpi_comm_world, npes, mpierr)
      call netcdf_err(error, 'writing ' // trim(records(rec)) // ' for file='//trim(outfile) )
      if (trim(records(rec)) .eq. 'u_inc') then
         ! process v_inc also.
-        call mpi_recv(go2(1,1), size(go2), mpi_double_precision, &
-                      rec-1, 2000+rec, mpi_comm_world, mpistat, mpierr)
+        do klev=1, lev
+          call mpi_recv(recv_layer, size(recv_layer), mpi_double_precision, &
+                        rec-1, 2000+rec, mpi_comm_world, mpistat, mpierr)
+          go2(:,klev) = recv_layer
+        enddo
         dummy_out = reshape(go2, (/lon_out,lat_out,lev/))
         error = nf90_inq_varid(ncid_out, 'v_inc', id_var)
         call netcdf_err(error, 'inquiring v_inc id for file='//trim(outfile) )
