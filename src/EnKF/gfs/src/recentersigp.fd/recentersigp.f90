@@ -46,28 +46,30 @@ program recentersigp
   TYPE(SIGIO_HEAD) :: SIGHEADI,SIGHEADO,SIGHEADMI,SIGHEADMO
   TYPE(SIGIO_DATA) :: SIGDATAI,SIGDATAO,SIGDATAMI,SIGDATAMO
   logical:: nemsio, sigio, ncio, increment, quantize
-  character*500 filename_meani,filename_meano,filenamein,filenameout,filename_meang
+  character*500 filename_meani,filename_meano,filenamein,filenameout,filename_meang,filenameg
   character*3 charnanal
   character(len=4) charnin
   character(16),dimension(:),allocatable:: fieldname_di,fieldname_mi,fieldname_mo
   character(16),dimension(:),allocatable:: fieldlevtyp_di,fieldlevtyp_mi,fieldlevtyp_mo
   integer,dimension(:),allocatable:: fieldlevel_di,fieldlevel_mi,fieldlevel_mo,orderdi,ordermi
   integer nsigi,nsigo,iret,mype,mype1,npe,nanals,ierr
-  integer:: nrec,latb,lonb,levs,npts,n,i,nbits,nvar,ndims,j
+  integer:: nrec,latb,lonb,levs,npts,n,i,nbits,nvar,ndims,j,arg_count
   real,allocatable,dimension(:):: rwork1d
   real,allocatable,dimension(:,:)   :: rwork1di,rwork1do,rwork1dmi,rwork1dmo
   real(4),allocatable, dimension(:,:) :: values_2d, values_2d_i, values_2d_mi,&
                                          values_2d_mo
   real(4),allocatable, dimension(:,:,:) :: values_3d, values_3d_i, values_3d_mi,&
-                                         values_3d_mo, values_3d_mb, values_3d_anl
+                                         values_3d_mo, values_3d_mb, values_3d_anl,&
+                                         values_3d_b
   real(4) compress_err
 
   type(nemsio_gfile) :: gfilei, gfileo, gfilemi, gfilemo
-  type(Dataset) :: dseti,dseto,dsetmi,dsetmo,dsetmg
+  type(Dataset) :: dseti,dseto,dsetmi,dsetmo,dsetmg,dsetg
   type(Dimension) :: londim,latdim,levdim
 
   character(len=12),dimension(10) :: incvars_to_zero !just picking 10 arbitrarily
-  namelist /recenter/ incvars_to_zero
+  logical :: clip_tracer, clip_var
+  namelist /recenter/ incvars_to_zero, clip_tracer
 
 ! Initialize mpi
   call MPI_Init(ierr)
@@ -80,6 +82,8 @@ program recentersigp
 
   NSIGI=21
   NSIGO=61
+
+  arg_count=command_argument_count()
 
 ! read data from this file
   call getarg(1,filenamein) ! increment or analysis
@@ -100,6 +104,9 @@ program recentersigp
 ! option for increment, read in ens mean guess
   call getarg(6,filename_meang) ! background ens mean fcst
 
+! clip tracer for increment
+  if (arg_count > 6) &
+  call getarg(7,filenameg) ! background of ensemble member  
 
   if (mype==0) then
      write(6,*)'RECENTERSIGP:  PROCESS ',nanals,' ENSEMBLE MEMBERS'
@@ -107,6 +114,7 @@ program recentersigp
      write(6,*)'filename_meani=',trim(filename_meani)
      write(6,*)'filename_meano=',trim(filename_meano)
      write(6,*)'filenameout=',trim(filenameout)
+     write(6,*)'filenameg=',trim(filenameg)
   endif
 
   sigio=.false.
@@ -243,6 +251,7 @@ program recentersigp
 
         ! read in namelist for incvars_to_zero
         incvars_to_zero(:) = 'NONE'
+        clip_tracer = .false.
         open(912,file='recenter.nml',form="formatted")
         read(912,recenter)
         close(912)
@@ -256,6 +265,7 @@ program recentersigp
         dsetmg = open_dataset(filename_meang)
         dseti  = open_dataset(trim(filenamein)//"_mem"//charnanal)
         dseto  = create_dataset(trim(filenameout)//"_mem"//charnanal, dseti, copy_vardata=.true.)
+        if (clip_tracer) dsetg = open_dataset(trim(filenameg)//"_mem"//charnanal)
         allocate(values_3d(lonb,latb,levs))
         do nvar=1,dseti%nvars
            ndims = dseti%variables(nvar)%ndims
@@ -263,6 +273,7 @@ program recentersigp
               call read_vardata(dseti,trim(dseti%variables(nvar)%name),values_3d_i)
               call read_vardata(dsetmi,trim(dseti%variables(nvar)%name),values_3d_mi)
               ! need to do select case since ges/anl and increment have different varnames
+              clip_var = .false.
               select case (dseti%variables(nvar)%name)
               case ('u_inc')
                  call read_vardata(dsetmg,'ugrd',values_3d_mb)
@@ -282,15 +293,48 @@ program recentersigp
               case ('sphum_inc')
                  call read_vardata(dsetmg,'spfh',values_3d_mb)
                  call read_vardata(dsetmo,'spfh',values_3d_anl)
+                 if (clip_tracer) then
+                   call read_vardata(dsetg,'spfh',values_3d_b)
+                   clip_var = .true.
+                 end if  
               case ('liq_wat_inc')
                  call read_vardata(dsetmg,'clwmr',values_3d_mb)
                  call read_vardata(dsetmo,'clwmr',values_3d_anl)
+                 if (clip_tracer) then
+                   call read_vardata(dsetg,'clwmr',values_3d_b)
+                   clip_var = .true.
+                 end if
               case ('o3mr_inc')
                  call read_vardata(dsetmg,'o3mr',values_3d_mb)
                  call read_vardata(dsetmo,'o3mr',values_3d_anl)
               case ('icmr_inc')
                  call read_vardata(dsetmg,'icmr',values_3d_mb)
                  call read_vardata(dsetmo,'icmr',values_3d_anl)
+                 if (clip_tracer) then
+                   call read_vardata(dsetg,'icmr',values_3d_b)
+                   clip_var = .true.
+                 end if
+              case ('rwmr_inc')
+                 call read_vardata(dsetmg,'rwmr',values_3d_mb)
+                 call read_vardata(dsetmo,'rwmr',values_3d_anl)
+                 if (clip_tracer) then
+                   call read_vardata(dsetg,'rwmr',values_3d_b)
+                   clip_var = .true.
+                 end if
+              case ('snmr_inc')
+                 call read_vardata(dsetmg,'snmr',values_3d_mb)
+                 call read_vardata(dsetmo,'snmr',values_3d_anl)
+                 if (clip_tracer) then
+                   call read_vardata(dsetg,'snmr',values_3d_b)
+                   clip_var = .true.
+                 end if
+              case ('grle_inc')
+                 call read_vardata(dsetmg,'grle',values_3d_mb)
+                 call read_vardata(dsetmo,'grle',values_3d_anl)
+                 if (clip_tracer) then
+                   call read_vardata(dsetg,'grle',values_3d_b)
+                   clip_var = .true.
+                 end if
               end select
               values_3d(:,:,:) = zero
               do j=1,latb
@@ -299,7 +343,17 @@ program recentersigp
 ! = original member increment + gsi control analysis - enkf mean analysis
                  values_3d(:,j,:) = values_3d_i(:,j,:) - values_3d_mb(:,latb-j+1,:) - values_3d_mi(:,j,:) + values_3d_anl(:,latb-j+1,:)
               end do
-              if (should_zero_increments_for(trim(dseti%variables(nvar)%name))) values_3d = zero
+              if (should_zero_increments_for(trim(dseti%variables(nvar)%name))) then
+                 values_3d = zero
+              else if (clip_var) then
+                 do j=1,latb
+                    values_3d_anl(:,j,:) = values_3d(:,j,:) + values_3d_b(:,latb-j+1,:)
+                 end do
+                 where (values_3d_anl < zero) values_3d_anl = tiny(zero)
+                 do j=1,latb
+                    values_3d(:,j,:) = values_3d_anl(:,j,:) - values_3d_b(:,latb-j+1,:)
+                 end do
+              end if
               call write_vardata(dseto,trim(dseti%variables(nvar)%name),values_3d)
            end if
         end do
@@ -308,12 +362,14 @@ program recentersigp
         if (allocated(values_3d_mi)) deallocate(values_3d_mi)
         if (allocated(values_3d_mb)) deallocate(values_3d_mb)
         if (allocated(values_3d_anl)) deallocate(values_3d_anl)
+        if (allocated(values_3d_b)) deallocate(values_3d_b)
         call write_attribute(dseto,'comment','recentered analysis increment using recentersigp')
         call close_dataset(dsetmi)
         call close_dataset(dsetmo)
         call close_dataset(dsetmg)
         call close_dataset(dseti)
         call close_dataset(dseto)
+        if (clip_tracer) call close_dataset(dsetg)
 
      else if (ncio) then
 

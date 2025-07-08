@@ -1158,10 +1158,13 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff
     fig,ax = plt.subplots(figsize=(10,12))
     #obscount.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
     #obscount.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
-    obscount.plot(ax=ax,kind='barh',alpha=alpha,fontsize=12,edgecolor='none')
+    if normdiff:
+        obscount.plot(ax=ax,kind='barh',alpha=alpha,fontsize=12,edgecolor='none')
+    else:
+        obscount.plot(ax=ax,kind='barh',alpha=alpha,fontsize=16,edgecolor='none')
     titlestr = 'Assimilated: # of %s observations\n%s' % (inst.upper(),title_substr)
-    ax.set_title(titlestr,fontsize='x-large')
-    if len(statslvl) == 1:
+    ax.set_title(titlestr,fontsize=18)
+    if statslvl == ['channel']:
         yindex=obscount.index.get_level_values('channel')
         if wndic is not None:
             y2index=[]
@@ -1181,6 +1184,12 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff
         plt.legend(loc=0,numpoints=1,frameon=False)
         #plt.ylim(1,yindex[-1]+1)
         #plt.yticks(yindex)
+    elif statslvl == ['satellite']:
+        yindex=obscount.index.get_level_values('satellite')
+        ax.set_ylabel('Satellite',fontsize=16)
+        ax.yaxis.set_ticklabels(yindex, fontsize=16)
+        ax.xaxis.set_tick_params(labelsize=16) 
+        plt.legend(loc=0,numpoints=1,frameon=False)
     else:
         yticklabels_new = get_yticklabels_new(ax)
         if len(yticklabels_new) > 25:
@@ -1192,7 +1201,7 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff
     if normdiff:
         plt.xlabel('Mean Assimilated Obs Count (%, normalized)')    
     else:
-        plt.xlabel('Mean Assimilated Obs Count')
+        plt.xlabel('Mean Assimilated Obs Count',fontsize=16)
 
     return fig
 
@@ -1284,8 +1293,10 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',stat='std',normalize=False
     #print ('omfstdwci')
     #print (omfstdwci)
     for e,expid in enumerate(labels):
+        print ('experiment: ', expid)
         if normalize and e > 0:
             expdf = dfin[expid][[statvar]].astype(float)
+            #print (expdf)
             #expdf = expdf.dropna()
             if dfina is not None:
                 expdfa = dfina[expid][[statvar]].astype(float)
@@ -1302,6 +1313,8 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',stat='std',normalize=False
             stdmean=np.array([x[0] for x in profile])
             column_values = stdmean
             column_name = '%s_omfstd'%(labels[e])
+            #print (column_name)
+            #print (column_values)
             omfstdwci[column_name]=column_values
             tmp=np.array([x[1] for x in profile])
             tmp2=np.array([x[0] for x in tmp]) 
@@ -2114,6 +2127,7 @@ if __name__ == '__main__':
     if instruments is not None:
         csvdir='/scratch2/GFDL/gfdlscr/Mingjing.Tong/gsidiag/ush/gsistat/data'
         for inst in instruments:
+            print ('instrument ', inst)
             figs = []; fignames = []
             if 'cris' in inst or inst == 'iasi' or inst == 'airs':
                 instid = inst
@@ -2155,12 +2169,15 @@ if __name__ == '__main__':
                         fig = plot_channel_omf_FGvsANL(insts[inst],insts2[inst],insts3[inst],
                                                        stats='count',inst=inst,wndic=wndic)
                         figs.append(fig); fignames.append(inst+'count_fganl')
+                else:
+                    fig = plot_channel_nobsdiff(insts[inst],inst=inst,statslvl=['satellite'],normdiff=False,wndic=wndic)
+                    figs.append(fig) ; fignames.append(inst+'count')
                     
                 fig = plot_channel_omfbc(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic)
                 figs.append(fig) ; fignames.append(inst+'omf')
                 fig = plot_channel_omfbc(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic,wobc=True) 
                 figs.append(fig) ; fignames.append(inst+'omfwobc')
-             
+
                 if not subtypsum:
                     bfigs,bfignames = plot_channel_omfbias(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic)
                 else:
