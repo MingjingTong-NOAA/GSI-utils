@@ -130,21 +130,20 @@ def get_inst_data(gsistat,instname,select=None,level=None,plotanl=False,usedonly
     df = []
     for n, i in enumerate(gsistat):
         tmp = i.extract_instrument('rad',instname,plotanl=plotanl,usedonly=usedonly)
-        if tmp.empty or len(tmp) == 0:
+        if tmp is None or len(tmp) == 0:
             print ('file %s missing %s or no data available'%(str(n),instname))
         else: 
             if select is not None:
                 tmp = tmp.xs(select,level=level,drop_level=False)
             df.append(tmp)
 
-    if not tmp.empty:
+    lendf = 0
+    if tmp is not None:
         lendf = len(df)
-        if lendf != 0:
+        if lendf > 0:
             df = pd.concat(df)
-    else:
-        lendf=0
 
-    if not subtypsum:
+    if lendf > 0 and not subtypsum:
         count = df['nassim']
         omf2 = df['OmFbc_rms']*df['OmFbc_rms']*df['nassim']
         omfsum = df['OmF_bc']*df['nassim']
@@ -1137,16 +1136,21 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff
 
     # Collect all experiments into a single DataFrame
     assim = []
+    missing_cntl = False
+    dfexp = list(dfin.keys())
     for e,expid in enumerate(labels):
-        tmp = dfin[expid].groupby(level=statslvl).mean()
-        tmp[['nassim']] = tmp[['nassim']].astype(int)
-        tmp2 = tmp['nassim']
-        tmp2.name = labels[e]
-        assim.append(tmp2)
+        if not expid in dfexp:
+            print (f"{inst} not assimilated in {expid}")
+        else:
+            tmp = dfin[expid].groupby(level=statslvl).mean()
+            tmp[['nassim']] = tmp[['nassim']].astype(int)
+            tmp2 = tmp['nassim']
+            tmp2.name = expid
+            assim.append(tmp2)
 
     assim = pd.concat(assim,axis=1).dropna()
 
-    if normdiff:
+    if normdiff and len(dfexp) > 1:
         tmp = assim.div(assim.iloc[:,0],axis='index') * 100.0 - 100.0
         obscount = tmp.drop(tmp.columns[0],axis=1)
     else:
@@ -1158,11 +1162,11 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff
     fig,ax = plt.subplots(figsize=(10,12))
     #obscount.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
     #obscount.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
-    if normdiff:
+    if normdiff and len(dfexp) > 1:
         obscount.plot(ax=ax,kind='barh',alpha=alpha,fontsize=12,edgecolor='none')
     else:
         obscount.plot(ax=ax,kind='barh',alpha=alpha,fontsize=16,edgecolor='none')
-    titlestr = 'Assimilated: # of %s observations\n%s' % (inst.upper(),title_substr)
+    titlestr = 'Assimilated: # of %s observations\n%s ref: %s' % (inst.upper(),title_substr,dfexp[0])
     ax.set_title(titlestr,fontsize=18)
     if statslvl == ['channel']:
         yindex=obscount.index.get_level_values('channel')
@@ -1205,26 +1209,28 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff
 
     return fig
 
-def plot_channel_radfit(dfin,dflen,dfina=None,inst='',stat='std',normalize=False,
+def plot_channel_radfit(dfin,dfina=None,inst='',stat='std',normalize=False,
                         obsnum=False,statslvl=['satellite','channel'],wndic=None):
 
-    if obsnum:
+    dfexp=list(dfin.keys())
+    if obsnum and len(dfexp) > 1:
         fig, axes = plt.subplots(1,2,figsize=(8, 6))
     else:
         fig, ax = plt.subplots(figsize=(11,8))
 
     # Collect all experiments into a single DataFrame
-    if obsnum:
+    if obsnum and len(dfexp) > 1: 
         ax = axes[0]
         assim = []
         for e,expid in enumerate(labels):
-            #print ('expid ', expid)
-            #print (dfin[expid])
-            tmp = dfin[expid].groupby(level=statslvl).mean()
-            tmp[['nassim']] = tmp[['nassim']].astype(int)
-            tmp2 = tmp['nassim']
-            tmp2.name = labels[e]
-            assim.append(tmp2)
+            if not expid in dfexp:
+                print (f"{inst} not assimilated in {expid}")
+            else:
+                tmp = dfin[expid].groupby(level=statslvl).mean()
+                tmp[['nassim']] = tmp[['nassim']].astype(int)
+                tmp2 = tmp['nassim']
+                tmp2.name = expid
+                assim.append(tmp2)
 
         assim = pd.concat(assim,axis=1).dropna()
         tmp = assim.div(assim.iloc[:,0],axis='index') * 100.0
@@ -1236,13 +1242,13 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',stat='std',normalize=False
         #nobsdiff.plot(ax=ax,kind='barh',width=0.5,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
         #yindex=nobsdiff.index.get_level_values('channel')
         yindex=nobsdiff.index.values.tolist()
-        for e,expid in enumerate(labels):
+        for e,expid in enumerate(dfexp):
             if e > 0:
-                profile  = nobsdiff[labels[e]].values
+                profile  = nobsdiff[expid].values
                 a = np.arange(len(yindex))
-                ax.plot(profile, a, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                ax.plot(profile, a, marker='o', label=expid, color=mc[e], mfc=mc[e], mec=mc[e],
                         linewidth=2.0, alpha=alpha)
-        titlestr = 'Assimilated: # of %s observations\n%s' % (inst.upper(),title_substr)
+        titlestr = 'Assimilated: # of %s observations\n%s ref: %s' % (inst.upper(),title_substr,dfexp[0])
         if len(statslvl) == 1:
             ax.vlines(100.0,a[0],a[-1],colors='k',linestyles='-',linewidth=0.5,label=None)
             if len(labels) > 1:
@@ -1281,55 +1287,54 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',stat='std',normalize=False
         statvar = 'OmFbc_rms'
 
     omfstd = []; CI_95 = []
-    cntldf=dfin[labels[0]][[statvar]].astype(float)
-    #print (cntldf)
-    #cntldf=cntldf.dropna()
-    #cidx = cntldf.index.get_level_values('channel').to_list()
-    #print (cidx)
-    if dfina is not None:
-        cntldfa=dfina[labels[0]][[statvar]].astype(float)
-    #omfstdwci=cntldf.groupby(level=['satellite','channel']).mean()
-    omfstdwci=cntldf.groupby(level=['channel']).mean()
-    #print ('omfstdwci')
-    #print (omfstdwci)
-    for e,expid in enumerate(labels):
-        print ('experiment: ', expid)
-        if normalize and e > 0:
+    for e,expid in enumerate(dfexp):
+        if e == 0:
+            cntldf=dfin[expid][[statvar]].astype(float)
+            ncycles=len(cntldf.index.unique(level='date').to_list())
+            if dfina is not None:
+                cntldfa=dfina[expid][[statvar]].astype(float)
+            omfstd=cntldf.groupby(level=statslvl).mean()
+        elif normalize and len(dfexp) > 1:
             expdf = dfin[expid][[statvar]].astype(float)
-            #print (expdf)
             #expdf = expdf.dropna()
             if dfina is not None:
                 expdfa = dfina[expid][[statvar]].astype(float)
             normdf=expdf.div(cntldf,axis=1)
-            #print ('normdf')
-            #print (normdf)
-            #normdf=normdf.dropna()
+            """ If the number of channels assimilated are differet between experiments,
+                the resulting DataFrame will contain NaN for those unaligned channels. 
+                df.dropna is used to remove those channels, assuming cntl has smaller 
+                nubmer of channels """
+            if len(expdf) > len(cntldf):
+                normdf=normdf.dropna()
+            elif len(expdf) < len(cntldf):
+                print ('number of channels smaller than cntl') 
             normdf[statvar]=normdf[statvar]*100.0
             #profile=normdf.groupby(expdf.index).apply(mean_confidence_interval)
             #profile=normdf.groupby(level=['satellite','channel']).apply(mean_confidence_interval)
-            profile=normdf.groupby(level=['channel']).apply(mean_confidence_interval)
-            #print ('profile')
-            #print (profile)
-            stdmean=np.array([x[0] for x in profile])
-            column_values = stdmean
-            column_name = '%s_omfstd'%(labels[e])
-            #print (column_name)
-            #print (column_values)
-            omfstdwci[column_name]=column_values
-            tmp=np.array([x[1] for x in profile])
-            tmp2=np.array([x[0] for x in tmp]) 
-            column_values = tmp2
-            column_name = '%s_ci95'%(labels[e])
-            omfstdwci[column_name]=column_values
-            #print (omfstdwci)
+            if ncycles > 10:
+                profile=normdf.groupby(level=['channel']).apply(mean_confidence_interval)
+                stdmean=np.array([x[0] for x in profile])
+                column_values = stdmean
+                column_name = '%s_omfstd'%(expid)
+                omfstd[column_name]=column_values
+                tmp=np.array([x[1] for x in profile])
+                tmp2=np.array([x[0] for x in tmp]) 
+                column_values = tmp2
+                column_name = '%s_ci95'%(expid)
+                omfstd[column_name]=column_values
+            else:
+                profile=normdf.groupby(level=['channel']).mean()
+                column_name = '%s_omfstd'%(expid)
+                if e == 1:
+                    omfstd=profile.rename(columns={statvar: column_name})
+                else:
+                    omfstd=pd.concat([omfstd,profile.rename(columns={statvar: column_name})],axis=1)
         else:
             tmp = dfin[expid].groupby(level=statslvl).mean()
             tmp[[statvar]] = tmp[[statvar]].astype(float)
             tmp2 = tmp[statvar]
-            tmp2.name = labels[e]
+            tmp2.name = expid
             omfstd.append(tmp2)
-            #print ('omfstd')
-            #print (omfstd)
     
     if not normalize:
         omfstd = pd.concat(omfstd,axis=1)
@@ -1340,32 +1345,31 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',stat='std',normalize=False
     
     if obsnum:
         ax = axes[1]
-    if normalize:
-        tomfstdwci=omfstdwci
-        yindex0=tomfstdwci.index.values.tolist()
+    if normalize and len(dfexp) > 1:
+        tomfstd=omfstd
+        yindex0=tomfstd.index.values.tolist()
         mchan=len(yindex0)
-        for e,expid in enumerate(labels):
-            #print ('exp ', expid)
+        for e,expid in enumerate(dfexp):
             if e == 0:
                 ax.vlines(100.0,a[0],a[-1],colors='k',linestyles='-',linewidth=0.5,label=None)
             else:
-                column_std='%s_omfstd'%(labels[e])
-                column_ci95='%s_ci95'%(labels[e])
+                column_std='%s_omfstd'%(expid)
+                column_ci95='%s_ci95'%(expid)
                 elevs = np.array(yindex) + e*0.1
-                tomfstdwci = tomfstdwci.dropna(subset=[column_std])
-                yindex=tomfstdwci.index.values.tolist()
+                tomfstd = tomfstd.dropna(subset=[column_std])
+                yindex=tomfstd.index.values.tolist()
                 if len(yindex) < mchan:
                     misch=list(set(yindex0) - set(yindex))
                     print (f'WARNING: missing {inst} channel {misch} for experiment {expid}')
                 a = np.arange(len(yindex)) 
                 #with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-                if dflen < 10 or len(a) < 3:
-                    ax.plot(tomfstdwci[[column_std]].values, a, marker='o', label=labels[e], color=mc[e], mfc=mc[e], mec=mc[e],
+                if ncycles <= 10 or len(a) < 3:
+                    ax.plot(tomfstd[[column_std]].values, a, marker='o', label=expid, color=mc[e], mfc=mc[e], mec=mc[e],
                             linewidth=2.0, alpha=alpha)
                 else:
-                    ax.errorbar(tomfstdwci[[column_std]].values[:,0], a, xerr=tomfstdwci[[column_ci95]].values[:,0],color=mc[e],
+                    ax.errorbar(tomfstd[[column_std]].values[:,0], a, xerr=tomfstd[[column_ci95]].values[:,0],color=mc[e],
                                 label=expid)
-        if len(labels) > 1:
+        if len(dfexp) > 1:
             ax.legend(loc=0,numpoints=1,fontsize=10,frameon=False)
         ax.xaxis.set_tick_params(labelsize=8)
         if inst == 'airs' or inst == 'iasi' or 'cris' in inst: 
@@ -1380,9 +1384,9 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',stat='std',normalize=False
             ax.set_xlabel('OmF std. dev. (%, normalized)',fontsize=10)
         else:
             ax.set_xlabel('rms of OmF. (%, normalized)',fontsize=10)
-        amin = tomfstdwci[[column_std]].values.min()
+        amin = tomfstd[[column_std]].values.min()
         amin = amin - (100.0- amin) * 0.1
-        amax = tomfstdwci[[column_std]].values.max()
+        amax = tomfstd[[column_std]].values.max()
         amax = amax + (amax - 100.0) * 0.1
         #if amin > 99.99 or amax < 100.001:
         #    ax.set_xlim(left=99.98, right=100.02)
@@ -1402,15 +1406,15 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',stat='std',normalize=False
 
     if not obsnum:
         if stat == 'std':
-            titlestr = 'Normalized OmF std. dev of %s observations\n%s' % (inst.upper(),title_substr)
+            titlestr = 'Normalized OmF std. dev of %s observations\n%s ref: %s' % (inst.upper(),title_substr,dfexp[0])
         else:
-            titlestr = 'Normalized rms of OmF of %s observations\n%s' % (inst.upper(),title_substr)
+            titlestr = 'Normalized rms of OmF of %s observations\n%s ref: %s' % (inst.upper(),title_substr,dfexp[0])
         ax.set_title(titlestr,fontsize='x-large')
     else:
         if stat == 'std':
-            titlestr = 'Normalized Obs count & OmF std. dev of %s observations\n%s' % (inst.upper(),title_substr)
+            titlestr = 'Normalized Obs count & OmF std. dev of %s observations\n%s ref: %s' % (inst.upper(),title_substr,dfexp[0])
         else:
-            titlestr = 'Normalized Obs count & rms of OmF of %s observations\n%s' % (inst.upper(),title_substr)
+            titlestr = 'Normalized Obs count & rms of OmF of %s observations\n%s ref: %s' % (inst.upper(),title_substr,dfexp[0])
         fig.suptitle(titlestr, fontsize=12)
 
     return fig
@@ -1418,24 +1422,26 @@ def plot_channel_radfit(dfin,dflen,dfina=None,inst='',stat='std',normalize=False
 def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel'],wobc=False,wndic=None):
 
     # Collect all experiments into a single DataFrame
+    dfexp=list(dfin.keys())
     omfbc = []
     for e,expid in enumerate(labels):
-        tmp = dfin[expid].groupby(level=statslvl).mean()
-        if wobc:
-            tmp[['OmF_wobc']] = tmp[['OmF_wobc']].astype(float)
-            tmp2 = tmp['OmF_wobc']
+        if not expid in dfexp:
+            print (f"{inst} not assimilated in {expid}")
         else:
-            tmp[['OmF_bc']] = tmp[['OmF_bc']].astype(float)
-            tmp2 = tmp['OmF_bc']
-        tmp2.name = labels[e]
-        omfbc.append(tmp2)
+            tmp = dfin[expid].groupby(level=statslvl).mean()
+            if wobc:
+                tmp[['OmF_wobc']] = tmp[['OmF_wobc']].astype(float)
+                tmp2 = tmp['OmF_wobc']
+            else:
+                tmp[['OmF_bc']] = tmp[['OmF_bc']].astype(float)
+                tmp2 = tmp['OmF_bc']
+            tmp2.name = expid
+            omfbc.append(tmp2)
 
     omfbc = pd.concat(omfbc,axis=1)
-    #omfbc = omfbc.div(omfbc.iloc[:,0],axis='index') - 1.0
-
-    lc = mc[0] if len(labels) == 1 else mc[:len(labels)]
 
     fig,ax = plt.subplots(figsize=(10,8))
+    lc = mc[0] if len(dfexp) == 1 else mc[:len(dfexp)]
     #omfbc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
     #omfbc.plot(ax=ax,kind='barh',width=0.9,color=lc,alpha=alpha,fontsize=12,edgecolor='none',linewidth=0.0)
     #omfbc.plot(ax=ax,kind='barh',width=0.5,color=lc,fontsize=12,edgecolor='none')
@@ -1484,13 +1490,13 @@ def plot_channel_omfbc(dfin,inst='',statslvl=['satellite','channel'],wobc=False,
 def plot_channel_omfbias(dfin,inst='',statslvl=['satellite','channel'],wndic=None):
 
     # Collect all experiments into a single DataFrame
+    dfexp=list(dfin.keys())
     figs = []; fignames = []
-    for e,expid in enumerate(labels):
+    for e,expid in enumerate(dfexp):
         tmp = dfin[expid].groupby(level=statslvl).mean()
         tmp[['OmF_wobc','OmF_bc']] = tmp[['OmF_wobc','OmF_bc']].astype(float)
         omfbc = tmp[['OmF_wobc','OmF_bc']]
         omfbc.columns = ['bfbc','aftbc']
-        #omfbc.rename(columns={'OmF_wobc': labels[e]+'bfbc', 'OmF_bc': labels[e]+'afbc'}, inplace=True)
         lc = mc[:2]
         fig,ax = plt.subplots(figsize=(10,8))
         #omfbc.plot(ax=ax,kind='barh',width=0.9,sort_columns=True,color=lc,alpha=alpha,fontsize=12,edgecolor='k',linewidth=0.0)
@@ -1521,13 +1527,13 @@ def plot_channel_omfbias(dfin,inst='',statslvl=['satellite','channel'],wndic=Non
             ax.yaxis.set_ticks(a[::2])
             ax.yaxis.set_ticklabels(yindex[::2])
 
-        titlestr = '%s OmF bias of %s observations\n%s' % (labels[e],inst.upper(),title_substr)
+        titlestr = '%s OmF bias of %s observations\n%s' % (expid,inst.upper(),title_substr)
         ax.set_title(titlestr,fontsize='x-large')
         if len(statslvl) > 1:
             yticklabels_new = get_yticklabels_new(ax)
             ax.set_yticklabels(yticklabels_new,fontsize=8)
         figs.append(fig)
-        fignames.append(inst+'omfbias'+labels[e])
+        fignames.append(inst+'omfbias'+expid)
 
     return figs, fignames
 
@@ -1801,6 +1807,7 @@ if __name__ == '__main__':
     parser.add_argument('-lclr','--linecolors',help='line colors',nargs='+',required=False, default=['k', 'b', 'r', 'g', 'm','c','y'])
     parser.add_argument('-style','--panelstyle',help='panel style',type=str,required=False,default='nappend')
     parser.add_argument('-nlegend','--no_legend',help='plot legend',action='store_true',required=False)
+    parser.add_argument('-diagdir','--diagdir',help='home directory of the diagnostic tool',type=str,required=True)
     parser.add_argument('-figdir','--figdir',help='figure archive directory',type=str,required=False,default='./')
 
     args = parser.parse_args()
@@ -1813,6 +1820,7 @@ if __name__ == '__main__':
         archdirs = [archdirs]
     subtypsum = args.subtypsum
     save_figure = args.save_figure
+    diagdir = args.diagdir
     figdir = args.figdir
     plot_conv = args.plot_conv
     plot_cnvall = args.plot_cnvall
@@ -1986,19 +1994,20 @@ if __name__ == '__main__':
                 expid_inst, lendf = get_inst_data(expid_gsistat,inst,select=1,level='it',plotanl=plot_anl,
                                                   usedonly=plot_used,subtypsum=subtypsum)
                 if lendf > 0:
+                    ncycles=lendf
                     tmp[expid] = expid_inst
                     insts[inst] = tmp
-                if plot_anl:
-                   expid_inst, lendf2 = get_inst_data(expid_gsistat,inst,select=2,level='it',plotanl=True,
-                                                      usedonly=plot_used,subtypsum=subtypsum)
-                   if lendf > 0 and lendf2 > 0:
-                       tmp2[expid] = expid_inst
-                       insts2[inst] = tmp2
-                   expid_inst, lendf3 = get_inst_data(expid_gsistat,inst,select=3,level='it',plotanl=True,
-                                                      usedonly=plot_used,subtypsum=subtypsum)
-                   if lendf > 0 and lendf3 > 0:
-                       tmp3[expid] = expid_inst
-                       insts3[inst] = tmp3
+                    if plot_anl:
+                        expid_inst, lendf2 = get_inst_data(expid_gsistat,inst,select=2,level='it',plotanl=True,
+                                                           usedonly=plot_used,subtypsum=subtypsum)
+                        if lendf > 0 and lendf2 > 0:
+                            tmp2[expid] = expid_inst
+                            insts2[inst] = tmp2
+                        expid_inst, lendf3 = get_inst_data(expid_gsistat,inst,select=3,level='it',plotanl=True,
+                                                           usedonly=plot_used,subtypsum=subtypsum)
+                        if lendf > 0 and lendf3 > 0:
+                            tmp3[expid] = expid_inst
+                            insts3[inst] = tmp3
 
     # Start plotting
 
@@ -2125,7 +2134,7 @@ if __name__ == '__main__':
         plt.close('all')
 
     if instruments is not None:
-        csvdir='/scratch2/GFDL/gfdlscr/Mingjing.Tong/gsidiag/ush/gsistat/data'
+        csvdir=f'{diagdir}/data'
         for inst in instruments:
             print ('instrument ', inst)
             figs = []; fignames = []
@@ -2144,20 +2153,20 @@ if __name__ == '__main__':
                     fig = plot_channel_nobsdiff(insts[inst],inst=inst,statslvl=['channel'],normdiff=False,wndic=wndic)
                     figs.append(fig); fignames.append(f'obscount_{inst}')
                     # plot OmF_std difference grouped by satellite and channel in bars
-                    #fig = plot_channel_radfit(insts[inst],lendf,inst=inst,wndic=wndic)
+                    #fig = plot_channel_radfit(insts[inst],inst=inst,wndic=wndic)
                     #figs.append(fig); fignames.append(inst+'fitbar')
-                    fig = plot_channel_radfit(insts[inst],lendf,inst=inst,normalize=True,obsnum=True,
+                    fig = plot_channel_radfit(insts[inst],inst=inst,normalize=True,obsnum=True,
                                               statslvl=['channel'],wndic=wndic)
                     figs.append(fig); fignames.append(inst+'fitstd')
-                    fig = plot_channel_radfit(insts[inst],lendf,inst=inst,stat='rms',normalize=True,obsnum=True,
+                    fig = plot_channel_radfit(insts[inst],inst=inst,stat='rms',normalize=True,obsnum=True,
                                               statslvl=['channel'],wndic=wndic)
                     figs.append(fig); fignames.append(inst+'rmsfit')
 
                     if plot_anl:
-                        fig = plot_channel_radfit(insts3[inst],lendf,inst=inst,normalize=True,obsnum=True,
+                        fig = plot_channel_radfit(insts3[inst],inst=inst,normalize=True,obsnum=True,
                                                   statslvl=['channel'],wndic=wndic)
                         figs.append(fig); fignames.append(inst+'fitstd_anl')
-                        fig = plot_channel_radfit(insts3[inst],lendf,inst=inst,stat='rms',normalize=True,obsnum=True,
+                        fig = plot_channel_radfit(insts3[inst],inst=inst,stat='rms',normalize=True,obsnum=True,
                                                   statslvl=['channel'],wndic=wndic)
                         figs.append(fig); fignames.append(inst+'rmsfit_anl')
                         fig = plot_channel_omf_FGvsANL(insts[inst],insts2[inst],insts3[inst],

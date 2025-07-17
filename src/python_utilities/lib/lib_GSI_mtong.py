@@ -351,7 +351,6 @@ class GSIstat(object):
         df[['channel', 'nassim', 'nrej']] = df[['channel', 'nassim', 'nrej']].astype(int)
         df[['oberr', 'OmF_wobc', 'OmF_bc', 'OmFbc_rms', 'OmFbc_std']] = df[['oberr', 'OmF_wobc', 'OmF_bc', 'OmFbc_rms', 'OmFbc_std']].astype(float)
 
-
         # Since iteration number is not readily available, make one
         if not df.empty:
             lendf = len(df)
@@ -406,6 +405,8 @@ class GSIstat(object):
 
             # Add datetime index
             df = self._add_datetime_index(df)
+        else:
+            df = None
 
         return df
 
@@ -481,7 +482,7 @@ class GSIstat(object):
         df = _pd.DataFrame(data=tmp, columns=columns)
         df[['it', 'typ', 'styp']] = df[['it', 'typ', 'styp']].astype(int)
         for col in columns[7:]:
-            df[[col]] = df[[col]].replace('********', _np.NaN).astype(float)
+            df[[col]] = df[[col]].replace('********', _np.nan).astype(float)
         df.set_index(columns[:7], inplace=True)
 
         return df
