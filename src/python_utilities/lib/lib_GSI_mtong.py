@@ -338,7 +338,7 @@ class GSIstat(object):
             inst = instrument
 
         tmp = []
-        pattern = '\s+\d+\s+\d+\s+%s_\S+\s+\d+\s+\d+\s+' % (inst)
+        pattern = r'\s+\d+\s+\d+\s+%s_\S+\s+\d+\s+\d+\s+' % (inst)
         for line in self._lines:
             if _re.match(pattern, line):
                 tst = line.strip().split()
@@ -416,7 +416,7 @@ class GSIstat(object):
         Search for surface pressure, sst, tcp
         '''
 
-        pattern = 'obs\s+use\s+typ\s+styp'
+        pattern = r'obs\s+use\s+typ\s+styp'
         header = None
         for line in self._lines:
             if _re.search(pattern, line):
@@ -427,7 +427,7 @@ class GSIstat(object):
             raise 'Unable to get header for %s'%(name)
 
         tmp = []
-        pattern = ' o-g (\d\d) %7s' %(name)
+        pattern = r' o-g (\d\d) %7s' %(name)
         for line in self._lines:
             if _re.match(pattern, line):
                 # don't add "all" data, this is a sum of the subset (asm, rej, mon)
@@ -465,7 +465,7 @@ class GSIstat(object):
             raise 'Unable to get header for %s' % name
 
         tmp = []
-        pattern = ' o-g (\d\d) %7s' % name
+        pattern = r' o-g (\d\d) %7s' % name
         for line in self._lines:
             if _re.match(pattern, line):
                 # don't add "all" data, this is a sum of the subset (asm, rej, mon)
@@ -494,7 +494,7 @@ class GSIstat(object):
         '''
 
         # Get header
-        pattern = 'it\s+sat\s+inst\s+'
+        pattern = r'it\s+sat\s+inst\s+'
         for line in self._lines:
             if _re.search(pattern, line):
                 header = _re.sub('#',' ',line)
@@ -502,7 +502,7 @@ class GSIstat(object):
                 break
 
         tmp = []
-        pattern = 'o-g (\d\d) %2s' % 'oz'
+        pattern = r'o-g (\d\d) %2s' % 'oz'
         for line in self._lines:
             if _re.match(pattern, line):
                 line = _re.sub('oz', ' ', line)
@@ -525,7 +525,7 @@ class GSIstat(object):
         '''
 
         # Get header
-        pattern = 'it\s+satellite\s+instrument\s+'
+        pattern = r'it\s+satellite\s+instrument\s+'
         for line in self._lines:
             if _re.search(pattern, line):
                 header = _re.sub('#', ' ', line)
@@ -533,7 +533,7 @@ class GSIstat(object):
                 break
 
         tmp = []
-        pattern = 'o-g (\d\d) %3s' % 'rad'
+        pattern = r'o-g (\d\d) %3s' % 'rad'
         for line in self._lines:
             if _re.match(pattern, line):
                 line = _re.sub('rad', ' ', line)

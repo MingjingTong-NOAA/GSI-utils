@@ -130,8 +130,10 @@ def get_inst_data(gsistat,instname,select=None,level=None,plotanl=False,usedonly
     df = []
     for n, i in enumerate(gsistat):
         tmp = i.extract_instrument('rad',instname,plotanl=plotanl,usedonly=usedonly)
-        if tmp is None or len(tmp) == 0:
-            print ('file %s missing %s or no data available'%(str(n),instname))
+        if tmp is None:
+            print ('file %s missing %s'%(str(n),instname))
+        elif len(tmp) == 0:
+            print (f'WARNING: {instname} may be passive, check if abias are all zero')
         else: 
             if select is not None:
                 tmp = tmp.xs(select,level=level,drop_level=False)
@@ -765,7 +767,7 @@ def plot_cost(minim):
     ax.xaxis.set_ticklabels(xlabels)
 
     ax.set_xlabel('Iteration',fontsize=12)
-    ax.set_ylabel('Cost function (x $\mathregular{10^%d}$)' % exponent,fontsize=12)
+    ax.set_ylabel(f'Cost function (x 10{to_superscript(exponent)})', fontsize=12)
 
     ymin,ymax = np.min(df2.min()),np.max(df2.max())
     dy = ymax - ymin
@@ -888,7 +890,7 @@ def plot_cost_gradient(minim):
     #ax.set_xticks(xticks[:-1])
     #ax.set_xticklabels(xticklabels[:-1])
     ax.set_xlabel('Iteration Number',fontsize=12)
-    ax.set_ylabel('Cost Function (x $\mathregular{10^%d}$)' % exponent,fontsize=12)
+    ax.set_ylabel(f'Cost Function (x 10{to_superscript(exponent)})', fontsize=12)
     ax.legend(fontsize=12,frameon=False)
     ax.text(0.15, 0.85, '(a)',
             verticalalignment='bottom', horizontalalignment='center',
@@ -987,7 +989,7 @@ def plot_Jo(minim):
     ax.set_xticks(xticks[:-1])
     ax.set_xticklabels(xticklabels[:-1])
     ax.set_xlabel('Iteration Number',fontsize=12)
-    ax.set_ylabel('Jo (x $\mathregular{10^%d}$)' % exponent,fontsize=12)
+    ax.set_ylabel(f'Jo (x 10{to_superscript(exponent)})', fontsize=12)
     ax.legend(fontsize=12,frameon=False)
     ax.text(0.15, 0.85, '(a)',
             verticalalignment='bottom', horizontalalignment='center',
@@ -1213,7 +1215,11 @@ def plot_channel_radfit(dfin,dfina=None,inst='',stat='std',normalize=False,
                         obsnum=False,statslvl=['satellite','channel'],wndic=None):
 
     dfexp=list(dfin.keys())
-    if obsnum and len(dfexp) > 1:
+    if len(dfexp) <= 1:
+        print ('No more than one experiment in dataframe, return None')
+        return None
+ 
+    if obsnum:
         fig, axes = plt.subplots(1,2,figsize=(8, 6))
     else:
         fig, ax = plt.subplots(figsize=(11,8))
@@ -1345,7 +1351,7 @@ def plot_channel_radfit(dfin,dfina=None,inst='',stat='std',normalize=False,
     
     if obsnum:
         ax = axes[1]
-    if normalize and len(dfexp) > 1:
+    if normalize:
         tomfstd=omfstd
         yindex0=tomfstd.index.values.tolist()
         mchan=len(yindex0)
@@ -1768,8 +1774,9 @@ def savefigure(
 def savefigs(figs,fignames):
     if len(figs) > 0 and len(figs) == len(fignames):
         for fig,figname in zip(figs,fignames):
-            figname = f'{figdir}/gsistat_{figname}'
-            savefigure(fig,figname,format='png')
+            if fig is not None:
+                figname = f'{figdir}/gsistat_{figname}'
+                savefigure(fig,figname,format='png')
 
     return
 
@@ -1898,29 +1905,29 @@ if __name__ == '__main__':
             suffix=".ensmean"
         if single_cycle:
             fname = os.path.join(archdir,expid,'%s.t%sz.gsistat%s'%(cdump,bdate.strftime('%Y%m%d%H')[-2:],suffix))
-            print (fname)
+            print (nfile, fname)
             if not os.path.exists(fname):
                 print ('\033[1;31m' + '%s does not exist' % fname + '\033[1;m')
                 continue
             gsistat[label].append(lgsi.GSIstat(fname,bdate.to_datetime()))
-            nfile =+ 1
+            nfile += 1
         elif random_cycle:
             print (archdir, expid, label)
             for fname in glob(os.path.join(archdir,expid,'gsistat.%s.*'%(cdump))):
-                print (fname)
+                print (nfile, fname)
                 adate=os.path.basename(fname)[-10:]
                 gsistat[label].append(lgsi.GSIstat(fname,pd.to_datetime(adate,format='%Y%m%d%H')))
-                nfile =+ 1
+                nfile += 1
         else:
             for adate in pd.date_range(bdate,edate,freq=cycle_freq):
                 fname = os.path.join(archdir,expid,'gsistat.%s.%s%s'%(cdump,adate.strftime('%Y%m%d%H'),suffix))
-                print (fname)
+                print (nfile, fname)
                 if not os.path.exists(fname):
                     print ('\033[1;31m' + '%s does not exist' % fname + '\033[1;m')
                     continue
                 gsistat[label].append(lgsi.GSIstat(fname,pd.to_datetime(adate)))
-                nfile =+ 1
-    
+                nfile += 1
+
         if plot_conv:
             if 'ps' in pltvar:
                 ps[label] = get_data1(gsistat[label],'ps',it=1,use='asm',typ='all',subtypsum=subtypsum)
