@@ -62,15 +62,16 @@ def get_data1(gsistat,varname,it=1,use='asm',typ='all',subtypsum=False):
                     print ('all')
                 print (f'{varname} sub types')
                 subtypes=np.unique(tmp.index.get_level_values('typ').values)
-                print (subtypes)
+                print ('subtypes ssssssss', subtypes)
             
             if not subtypsum and len(subtypes) > 1:
+                """ recompute the stats instead of using the mean of the subtype stats """
                 if varname in ['ps', 'sst', 'tcp']:
                     count = tmp['count']
                     omf2 = tmp['rms']*tmp['rms']*tmp['count']
                     omfsum = tmp['bias']*tmp['count']
                     tmpa = pd.concat([count,omfsum,omf2],keys=['count','bias', 'rms'],axis=1)
-                if varname in ['uv', 't', 'q', 'gps', 'amv']:
+                if varname in ['uv', 't', 'q', 'gps', 'amv', 'scrm']:
                     rms=tmp.xs('rms', axis=0, level='stat', drop_level=True)
                     bias=tmp.xs('bias', axis=0, level='stat', drop_level=True)
                     count=tmp.xs('count', axis=0, level='stat', drop_level=True)
@@ -78,30 +79,29 @@ def get_data1(gsistat,varname,it=1,use='asm',typ='all',subtypsum=False):
                     omfsum = (bias*count).assign(stat='bias').set_index('stat', append=True)
                     count=count.assign(stat='count').set_index('stat', append=True)
                     tmpa = pd.concat([count,omfsum,omf2],axis=0)
+            else:
+                tmpa = tmp
 
             """ sum over data types """
             if varname in ['ps', 'sst', 'tcp']:
-                if subtypsum or len(subtypes) == 1:
-                    tmp = tmp.groupby(level=['date','it','obs','use']).sum()
-                else:
-                    tmp = tmpa.groupby(level=['date','it','obs','use']).sum()
+                tmp = tmpa.groupby(level=['date','it','obs','use']).sum()
+                if not subtypsum and len(subtypes) > 1:
                     tmp['rms'] = np.sqrt(tmp['rms']/tmp['count'])
                     tmp['bias'] = tmp['bias']/tmp['count']
-            elif varname in ['uv', 't', 'q', 'gps', 'amv']:
-                if subtypsum or len(subtypes) == 1:
-                    tmp = tmp.groupby(level=['date','it','obs','use','stat']).sum()
-                else:
-                    tmp = tmpa.groupby(level=['date','it','obs','use','stat']).sum()
-                    rms = tmp.xs('rms', axis=0, level='stat')
-                    bias = tmp.xs('bias', axis=0, level='stat')
-                    count = tmp.xs('count', axis=0, level='stat')
+                tmp['std'] = np.sqrt(tmp['rms']*tmp['rms']-tmp['bias']*tmp['bias'])
+            elif varname in ['uv', 't', 'q', 'gps', 'amv', 'scrm']:
+                tmp = tmpa.groupby(level=['date','it','obs','use','stat']).sum()
+                rms = tmp.xs('rms', axis=0, level='stat')
+                bias = tmp.xs('bias', axis=0, level='stat')
+                count = tmp.xs('count', axis=0, level='stat')
+                if not subtypsum and len(subtypes) > 1:
                     rms = np.sqrt(rms/count)
                     bias = bias/count
-                    std = np.sqrt(rms*rms-bias*bias).assign(stat='std').set_index('stat', append=True)
-                    rms = rms.assign(stat='rms').set_index('stat', append=True)
-                    bias = bias.assign(stat='bias').set_index('stat', append=True)
-                    count = count.assign(stat='count').set_index('stat', append=True)
-                    tmp = pd.concat([count,bias,rms,std],axis=0)
+                std = np.sqrt(rms*rms-bias*bias).assign(stat='std').set_index('stat', append=True)
+                rms = rms.assign(stat='rms').set_index('stat', append=True)
+                bias = bias.assign(stat='bias').set_index('stat', append=True)
+                count = count.assign(stat='count').set_index('stat', append=True)
+                tmp = pd.concat([count,bias,rms,std],axis=0)
             else:
                 msg = 'get_data1: varname %s is not a valid variable\n' % varname
                 msg += 'try: ps, uv, t, q'
@@ -1877,22 +1877,24 @@ if __name__ == '__main__':
     ps_a, tcp_a, uv_a, t_a, q_a, sst_a, gps_a, amv_a, scrm_a =  {}, {}, {}, {}, {}, {}, {}, {}, {}
 
     if plot_cnvall:
-        uvtyp = [220,221,223,229,230,231,232,233,234,235,236,280,282,289,290]
+        uvtyp = [216,217,218,219,220,221,223,229,230,231,232,233,234,235,236,280,281,282,289,290]
     else:
-        uvtyp = [220,221,223,229,230,231,232,233,234,235,236,280,282,289,290]
-        ttyp = [120,132,180,182]
+        #uvtyp = [220,221,223,229,230,231,232,233,234,235,236,280,282,289,290]
+        uvtyp = [216,217,218,219,220,221,223,229,230,231,232,233,234,235,236,280,281,282,289,290]
+        ttyp = [118,119,120,180,182]
         #qtyp = [120,132,180,182]
-        qtyp = [120,132,133,136,180,182]
+        qtyp = [118,119,120,180,182]
         """ rawwinsonde """
-        #uvtyp = [220]
-        #ttyp = [120]
-        #qtyp = [120]
+        #uvtyp = [216,217,218,219,220]
+        #ttyp = [118,119,120]
+        #qtyp = [118,119,120]
         """ aircraft """
         #uvtyp = [230,231,232,233,234,235,236]
         #ttyp = [130,131,132,133,134,135,136]
         #qtyp = [130,131,132,133,134,135,136]
-    amvtyp = [242, 243, 244, 245, 246, 247, 250, 252, 253, 254, 257, 258, 259, 260]
-    scrmtyp = [280, 282, 289, 290]
+    amvtyp = [242, 243, 244, 245, 246, 247, 250, 252, 253, 254, 255, 257, 258, 259, 260]
+    scrmtyp = [289, 290]
+    #sfctyp = [280, 282, 289, 290]
 
     for expid,label,mode,cdump,archdir in zip(expids,labels,modes,cdumps,archdirs):
 
