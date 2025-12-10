@@ -139,6 +139,7 @@ def get_inst_data(gsistat,instname,select=None,level=None,plotanl=False,usedonly
                 tmp = tmp.xs(select,level=level,drop_level=False)
             df.append(tmp)
 
+    print ('concat gsistat')
     lendf = 0
     if tmp is not None:
         lendf = len(df)
@@ -152,8 +153,17 @@ def get_inst_data(gsistat,instname,select=None,level=None,plotanl=False,usedonly
         omfsum_wobc = df['OmF_wobc']*df['nassim']
         std = df['OmFbc_std']
         tmpa = pd.concat([count,omfsum_wobc,omfsum,omf2,std],keys=['nassim','OmF_wobc','OmF_bc','OmFbc_rms','OmFbc_std'],axis=1)
+        """
+        with open('output.txt', 'a') as f:
+            f.write(tmpa.to_string())
+        """
 
         dfout = tmpa.groupby(level=['date','channel']).sum()
+        """
+        with open('sum.txt', 'a') as f:
+            f.write('summmmmmmmmmmm')
+            f.write(dfout.to_string())
+        """
         dfout['OmFbc_rms'] = np.sqrt(dfout['OmFbc_rms']/dfout['nassim'])
         dfout['OmF_wobc']=dfout['OmF_wobc']/dfout['nassim']
         dfout['OmF_bc'] = dfout['OmF_bc']/dfout['nassim']
@@ -1144,8 +1154,8 @@ def plot_channel_nobsdiff(dfin,inst='',statslvl=['satellite','channel'],normdiff
         if not expid in dfexp:
             print (f"{inst} not assimilated in {expid}")
         else:
-            tmp = dfin[expid].groupby(level=statslvl).mean()
-            tmp[['nassim']] = tmp[['nassim']].astype(int)
+            tmp = dfin[expid].groupby(level=statslvl).sum()
+            #tmp[['nassim']] = tmp[['nassim']].astype(int)
             tmp2 = tmp['nassim']
             tmp2.name = expid
             assim.append(tmp2)
@@ -1232,8 +1242,8 @@ def plot_channel_radfit(dfin,dfina=None,inst='',stat='std',normalize=False,
             if not expid in dfexp:
                 print (f"{inst} not assimilated in {expid}")
             else:
-                tmp = dfin[expid].groupby(level=statslvl).mean()
-                tmp[['nassim']] = tmp[['nassim']].astype(int)
+                tmp = dfin[expid].groupby(level=statslvl).sum()
+                #tmp[['nassim']] = tmp[['nassim']].astype(int)
                 tmp2 = tmp['nassim']
                 tmp2.name = expid
                 assim.append(tmp2)
@@ -2156,62 +2166,84 @@ if __name__ == '__main__':
                 wndic=None
             if len(insts[inst]) != 0:
                 if len(expids) > 1:
-                    # plot difference of assimilated observation
-                    #fig = plot_channel_nobsdiff(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic)
+                    """ screen out dates, in which data is missing for certain experiments """
+                    tinsts = insts[inst]            
+                    date_lists = []
+                    for expid in labels:
+                        tdates = tinsts[expid].index.get_level_values('date').unique().tolist()
+                        print (f'{expid}: number of dates = ', len(tdates))
+                        date_lists.append(tdates)
+                    valid_dates = list(set(date_lists[0]).intersection(*date_lists[1:]))
+                    print ('valid number of dates = ', len(valid_dates))
+  
+                    vinsts={}
+                    for expid in labels:
+                        vinsts[expid] = tinsts[expid][tinsts[expid].index.get_level_values('date').isin(valid_dates)]
+
+                    """ plot difference of assimilated observation """
+                    #fig = plot_channel_nobsdiff(vinsts,inst=inst,statslvl=['channel'],wndic=wndic)
                     #figs.append(fig); fignames.append(f'obscount_norm_{inst}')
-                    fig = plot_channel_nobsdiff(insts[inst],inst=inst,statslvl=['channel'],normdiff=False,wndic=wndic)
+                    fig = plot_channel_nobsdiff(vinsts,inst=inst,statslvl=['channel'],normdiff=False,wndic=wndic)
                     figs.append(fig); fignames.append(f'obscount_{inst}')
                     # plot OmF_std difference grouped by satellite and channel in bars
-                    #fig = plot_channel_radfit(insts[inst],inst=inst,wndic=wndic)
+                    #fig = plot_channel_radfit(vinsts,inst=inst,wndic=wndic)
                     #figs.append(fig); fignames.append(inst+'fitbar')
-                    fig = plot_channel_radfit(insts[inst],inst=inst,normalize=True,obsnum=True,
+                    fig = plot_channel_radfit(vinsts,inst=inst,normalize=True,obsnum=True,
                                               statslvl=['channel'],wndic=wndic)
                     figs.append(fig); fignames.append(inst+'fitstd')
-                    fig = plot_channel_radfit(insts[inst],inst=inst,stat='rms',normalize=True,obsnum=True,
+                    fig = plot_channel_radfit(vinsts,inst=inst,stat='rms',normalize=True,obsnum=True,
                                               statslvl=['channel'],wndic=wndic)
                     figs.append(fig); fignames.append(inst+'rmsfit')
 
                     if plot_anl:
-                        fig = plot_channel_radfit(insts3[inst],inst=inst,normalize=True,obsnum=True,
+                        """ screen out dates, in which data is missing for certain experiments """
+                        tinsts2 = insts2[inst]
+                        tinsts3 = insts3[inst]
+                        vinsts2={}; vinsts3={}
+                        for expid in labels:
+                            vinsts2[expid] = tinsts2[expid][tinsts2[expid].index.get_level_values('date').isin(valid_dates)]
+                            vinsts3[expid] = tinsts3[expid][tinsts3[expid].index.get_level_values('date').isin(valid_dates)]
+
+                        fig = plot_channel_radfit(vinsts3,inst=inst,normalize=True,obsnum=True,
                                                   statslvl=['channel'],wndic=wndic)
                         figs.append(fig); fignames.append(inst+'fitstd_anl')
-                        fig = plot_channel_radfit(insts3[inst],inst=inst,stat='rms',normalize=True,obsnum=True,
+                        fig = plot_channel_radfit(vinsts3,inst=inst,stat='rms',normalize=True,obsnum=True,
                                                   statslvl=['channel'],wndic=wndic)
                         figs.append(fig); fignames.append(inst+'rmsfit_anl')
-                        fig = plot_channel_omf_FGvsANL(insts[inst],insts2[inst],insts3[inst],
+                        fig = plot_channel_omf_FGvsANL(vinsts,vinsts2,vinsts3,
                                                        stats='std',inst=inst,wndic=wndic)
                         figs.append(fig); fignames.append(inst+'std_fganl')
-                        fig = plot_channel_omf_FGvsANL(insts[inst],insts2[inst],insts3[inst],
+                        fig = plot_channel_omf_FGvsANL(vinsts,vinsts2,vinsts3,
                                                        stats='bias',inst=inst,wndic=wndic)
                         figs.append(fig); fignames.append(inst+'bias_fganl')
-                        fig = plot_channel_omf_FGvsANL(insts[inst],insts2[inst],insts3[inst],
+                        fig = plot_channel_omf_FGvsANL(vinsts,vinsts2,vinsts3,
                                                        stats='count',inst=inst,wndic=wndic)
                         figs.append(fig); fignames.append(inst+'count_fganl')
                 else:
-                    fig = plot_channel_nobsdiff(insts[inst],inst=inst,statslvl=['satellite'],normdiff=False,wndic=wndic)
+                    fig = plot_channel_nobsdiff(vinsts,inst=inst,statslvl=['satellite'],normdiff=False,wndic=wndic)
                     figs.append(fig) ; fignames.append(inst+'count')
                     
-                fig = plot_channel_omfbc(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic)
+                fig = plot_channel_omfbc(vinsts,inst=inst,statslvl=['channel'],wndic=wndic)
                 figs.append(fig) ; fignames.append(inst+'omf')
-                fig = plot_channel_omfbc(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic,wobc=True) 
+                fig = plot_channel_omfbc(vinsts,inst=inst,statslvl=['channel'],wndic=wndic,wobc=True) 
                 figs.append(fig) ; fignames.append(inst+'omfwobc')
 
                 if not subtypsum:
-                    bfigs,bfignames = plot_channel_omfbias(insts[inst],inst=inst,statslvl=['channel'],wndic=wndic)
+                    bfigs,bfignames = plot_channel_omfbias(vinsts,inst=inst,statslvl=['channel'],wndic=wndic)
                 else:
-                    bfigs,bfignames = plot_channel_omfbias(insts[inst],inst=inst,wndic=wndic)
+                    bfigs,bfignames = plot_channel_omfbias(vinsts,inst=inst,wndic=wndic)
                 if save_figure:
                     for fig,figname in zip(bfigs,bfignames):
                         figname = './gsistat_%s' % figname
                         savefigure(fig,figname,format='png')
 
-                """bfigs,bfignames = plot_channel_omf_FGANL(insts[inst],insts2[inst],insts3[inst],stats='std',inst=inst)
+                """bfigs,bfignames = plot_channel_omf_FGANL(vinsts,vinsts2,vinsts3,stats='std',inst=inst)
                 if save_figure:
                     for fig,figname in zip(bfigs,bfignames):
                         figname = './gsistat_%s' % figname
                         savefigure(fig,figname,format='png')
     
-                bfigs,bfignames = plot_channel_omf_FGANL(insts[inst],insts2[inst],insts3[inst],stats='bias',inst=inst)
+                bfigs,bfignames = plot_channel_omf_FGANL(vinsts,vinsts2,vinsts3,stats='bias',inst=inst)
                 if save_figure:
                     for fig,figname in zip(bfigs,bfignames):
                         figname = './gsistat_%s' % figname
