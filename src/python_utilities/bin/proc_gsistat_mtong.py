@@ -777,7 +777,7 @@ def plot_cost(minim):
     ax.xaxis.set_ticklabels(xlabels)
 
     ax.set_xlabel('Iteration',fontsize=12)
-    ax.set_ylabel(f'Cost function (x 10{to_superscript(exponent)})', fontsize=12)
+    ax.set_ylabel(f'Cost Function ($x 10^{{{exponent}}}$)', fontsize=12)
 
     ymin,ymax = np.min(df2.min()),np.max(df2.max())
     dy = ymax - ymin
@@ -900,7 +900,7 @@ def plot_cost_gradient(minim):
     #ax.set_xticks(xticks[:-1])
     #ax.set_xticklabels(xticklabels[:-1])
     ax.set_xlabel('Iteration Number',fontsize=12)
-    ax.set_ylabel(f'Cost Function (x 10{to_superscript(exponent)})', fontsize=12)
+    ax.set_ylabel(f'Cost Function ($x 10^{{{exponent}}}$)', fontsize=12)
     ax.legend(fontsize=12,frameon=False)
     ax.text(0.15, 0.85, '(a)',
             verticalalignment='bottom', horizontalalignment='center',
@@ -1818,7 +1818,7 @@ if __name__ == '__main__':
     parser.add_argument('-fganl','--plot_fganl',help='plot stats for FGvsANL',action='store_true',required=False)
     parser.add_argument('-scyc','--singe_cycle',help='single cycle from run directory',action='store_true',required=False)
     parser.add_argument('-randomcyc','--random_cycle',help='random cycles',action='store_true',required=False)
-    parser.add_argument('-cycfreq','--cycle_freq',help='cycle frequency',type=str,required=False,default='6H')
+    parser.add_argument('-cycfreq','--cycle_freq',help='cycle frequency',type=str,required=False,default='6h')
     parser.add_argument('-pltvar','--pltvar',help='variables to plot',nargs='+',required=False, default=['uv','t','q','gps','amv','scrm','ps'])
     parser.add_argument('-ylog','--ylog',help='log for y axis',action='store_true',required=False)
     parser.add_argument('-lclr','--linecolors',help='line colors',nargs='+',required=False, default=['k', 'b', 'r', 'g', 'm','c','y'])
