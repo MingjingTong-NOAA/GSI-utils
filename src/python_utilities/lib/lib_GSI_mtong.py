@@ -444,22 +444,54 @@ class GSIstat(object):
         return df
 
     # Conventional Observation Fits
-    def _get_conv(self,name):
-        '''
-        Search for uv, t, q, or gps
-        '''
-
-        # Get pressure levels
+    def _get_conv(self, name):
+        """Search for variable-specific pressure levels (ptop, pbot) and data rows.
+    
+        Parameters
+        ----------
+        name : str
+            Variable name to search for (e.g., 'q', 'uv', 't', 'gps')
+        """
+        # Map short names to log section headers if needed
+        var_markers = {
+            "q": "fit of q data",
+            "uv": "vfit of wind data",
+            "t": "fit of temperature data",
+            "gps": "fit of gps data",
+        }
+    
+        target_marker = var_markers.get(name.lower(), f"fit of {name} data")
+    
+        in_target_section = False
+        ptops = None
+        pbots = None
         header = None
+    
         for line in self._lines:
-            if 'ptop' in line:
-                ptops = _np.asarray(line.strip().split()[2:], dtype=float)
-            if 'pbot' in line:
-                pbots = _np.asarray(line.strip().split()[7:], dtype=float)
-                header = line.strip()
-                header = _re.sub('pbot', 'stat', header)
-                header = _re.sub('2000.0', 'column', header)
-                break
+            # Step 1: Detect entry into the specific variable section
+            if target_marker in line.lower():
+                in_target_section = True
+                continue
+    
+            # Step 2: Read pressure levels inside target section
+            if in_target_section:
+                tokens = line.strip().split()
+    
+                if "ptop" in tokens:
+                    idx = tokens.index("ptop")
+                    ptops = _np.asarray(tokens[idx + 1 :], dtype=float)
+    
+                elif "pbot" in tokens:
+                    idx = tokens.index("pbot")
+                    pbots = _np.asarray(tokens[idx + 1 :], dtype=float)
+    
+                    header = line.strip()
+                    header = _re.sub(r"\bpbot\b", "stat", header)
+                    header = _re.sub(r"2000\.0", "column", header)
+    
+                # Step 3: Stop once you reach the actual data lines for this variable
+                elif f" {name} " in line and ("count" in line or "bias" in line):
+                    break
 
         if header is None:
             raise 'Unable to get header for %s' % name
